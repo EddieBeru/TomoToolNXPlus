@@ -12196,6 +12196,64 @@ static void FinishBundleApply(int userIdx) {
     }
 }
 
+// Nuevas implementaciones
+static void TexRow0_Step(int dir) {
+    if (dir == -99) //Sin pulsaciones
+        return;
+    
+
+    int cur = (int)gCanvasShape;
+    if (dir >= 0) 
+        cur = (cur + 1) % 3;
+    else     
+        cur = (cur + 2) % 3;
+
+    gCanvasShape = (TextureProcessor::CanvasShape)cur;
+    SaveConfig();
+}
+
+static void TexRow1_Step(int dir) {
+    if (dir == -99) //Sin pulsaciones
+        return;
+    
+    gEncMode = (gEncMode == TextureProcessor::Bc1Encoder::Custom)
+        ? TextureProcessor::Bc1Encoder::PCA
+        : TextureProcessor::Bc1Encoder::Custom;
+    SaveConfig();
+}
+
+static void TexRow2_Step(int dir) {
+    if (dir == 0 || dir == -99) //Sin pulsaciones
+        return;
+    
+    int cur = (int)gBc1Mode;
+    if (dir > 0) cur = (cur + 1) % 3;
+    if (dir < 0)  cur = (cur + 2) % 3;
+    if (dir != 0) { gBc1Mode = (TextureProcessor::Bc1Mode)cur; SaveConfig(); }
+}
+
+static void TexRow3_Step(int dir) {
+    if (dir == -99) //Sin pulsaciones
+        return;
+    
+    int cur = (int)gFitMode;
+    if (dir > 0) cur = (cur + 1) % 3;
+    if (dir < 0)  cur = (cur + 2) % 3;
+    if (dir != 0) { gFitMode = (TextureProcessor::FitMode)cur; SaveConfig(); }
+}
+
+static void TexRow4_Step(int dir) {
+    if (dir == 0 || dir == -99) //Sin pulsaciones
+        return;
+    
+    int cur = (gMatte.a == 0) ? 0
+            : (gMatte.r == 255 && gMatte.g == 255 && gMatte.b == 255) ? 1
+            : (gMatte.r == 0   && gMatte.g == 0   && gMatte.b == 0)   ? 2 : 0;
+    if (dir > 0) cur = (cur + 1) % 3;
+    else cur = (cur + 2) % 3;
+    TSetMatte(cur);
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 int main(int,char**) {
@@ -14376,45 +14434,26 @@ int main(int,char**) {
                 bool left  = (kNav&(HidNpadButton_Left |HidNpadButton_StickLLeft |HidNpadButton_StickRLeft))  != 0;
                 bool right = (kNav&(HidNpadButton_Right|HidNpadButton_StickLRight|HidNpadButton_StickRRight)) != 0;
                 bool a     = (kDown&HidNpadButton_A) != 0;
+                int dir    = (right ? 1 : (left ? -1 : a ? 0 : -99));
+                
                 // Row 0: Canvas shape — cycle Square -> Book -> TV.
-                if (gTexSettingsSel == 0) {
-                    int cur = (int)gCanvasShape;
-                    if (right || a) cur = (cur + 1) % 3;
-                    if (left)       cur = (cur + 2) % 3;
-                    if (left || right || a) {
-                        gCanvasShape = (TextureProcessor::CanvasShape)cur;
-                        SaveConfig();
-                    }
-                }
+                if (gTexSettingsSel == 0)
+                    TexRow0_Step(dir);
                 // Row 1: Encoder — Left/Right (and A) toggle Custom <-> PCA.
                 if (gTexSettingsSel == 1 && (left || right || a)) {
-                    gEncMode = (gEncMode == TextureProcessor::Bc1Encoder::Custom)
-                             ? TextureProcessor::Bc1Encoder::PCA
-                             : TextureProcessor::Bc1Encoder::Custom;
-                    SaveConfig();
+                    TexRow1_Step(dir);
                 }
                 // Row 2: BC1 Mode — active only with Custom encoder.
                 if (gTexSettingsSel == 2 && gEncMode == TextureProcessor::Bc1Encoder::Custom) {
-                    int cur = (int)gBc1Mode;
-                    if (right) cur = (cur + 1) % 3;
-                    if (left)  cur = (cur + 2) % 3;
-                    if (right || left) { gBc1Mode = (TextureProcessor::Bc1Mode)cur; SaveConfig(); }
+                    TexRow2_Step(dir);
                 }
                 // Row 3: Fit mode — cycle Cover -> Contain -> Fill.
                 if (gTexSettingsSel == 3) {
-                    int cur = (int)gFitMode;
-                    if (right) cur = (cur + 1) % 3;
-                    if (left)  cur = (cur + 2) % 3;
-                    if (right || left) { gFitMode = (TextureProcessor::FitMode)cur; SaveConfig(); }
+                    TexRow3_Step(dir);
                 }
                 // Row 4: Background — Transparent / White / Black, only with Contain.
                 if (gTexSettingsSel == 4 && gFitMode == TextureProcessor::FitMode::Contain) {
-                    int cur = (gMatte.a == 0) ? 0
-                            : (gMatte.r == 255 && gMatte.g == 255 && gMatte.b == 255) ? 1
-                            : (gMatte.r == 0   && gMatte.g == 0   && gMatte.b == 0)   ? 2 : 0;
-                    if (right) cur = (cur + 1) % 3;
-                    if (left)  cur = (cur + 2) % 3;
-                    if (right || left) TSetMatte(cur);
+                    TexRow4_Step(dir);
                 }
                 // B backs out of the settings drawer to the texture tab it was
                 // opened from (the gear that opens it lives there) — more
