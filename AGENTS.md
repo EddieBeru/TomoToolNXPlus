@@ -118,3 +118,11 @@ the entire codebase already complies.
 - If local authentication or networking fails, report the issue and prepare
   commands for the user. Do not fall back to the connector, or automatically
   change, reconnect, or enable GitHub connections.
+
+## 7. Code comments
+
+- Write concise comments for experienced developers, only where needed to explain
+  non-obvious intent, behavior, constraints, or API contracts.
+- Prefer clear names and structure. Do not narrate obvious code, teach basic
+  programming, or add redundant function summaries or development history.
+- Preserve essential save-format, safety, platform, and licensing information.

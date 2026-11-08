@@ -1076,7 +1076,6 @@ static std::string  gPreviewStem;
 static std::string  gOnSwitchMsg;
 static SDL_Color    gOnSwitchMsgCol = COL_TEXT;
 static bool         gPreviewNoSrgb  = false; // color encoding toggle: false=sRGB, true=Linear
-// Texture import preferences and settings focus; transitions live in the model.
 static TextureSettings::State gTextureSettings;
 
 // File browser
@@ -4155,8 +4154,6 @@ static void TUgcActivateBtn(int) {
 }
 // Touch entry-point: focus the tapped button, then run it.
 static void TUgcBtnTap(int i) { gUgcBtnSel = i; TUgcActivateBtn(0); }
-// UI adapters persist only actual preference changes. The model owns validation,
-// availability, and focus for both controller actions and touch selections.
 static void ApplyTextureSettingsAction(TextureSettings::Action action) {
     if (TextureSettings::Apply(gTextureSettings, action)) SaveConfig();
 }
@@ -5657,8 +5654,6 @@ static void DrawTexSettings() {
         DrawTabUnderline(0);
     }
 
-    // Shape, Encoder, BC1 Mode, Fit, and Background share the model's row order
-    // and availability rules. Keep the existing pill-button presentation.
     const int contentX = (SCREEN_W - 720) / 2;
     const int contentY = 68;
     const int sectionW = 720;
@@ -14354,7 +14349,7 @@ int main(int,char**) {
                 }
 
             } else if (gOnSwitchMode == OnSwitchMode::TexSettings) {
-                // Legacy tab/back bindings remain until the global navigation feature.
+                // Global navigation migration is pending.
                 TextureSettings::NormalizeFocus(gTextureSettings);
                 if (kDown&HidNpadButton_L) {
                     gOnSwitchMode=OnSwitchMode::WebUI; gOnSwitchMsg=""; break;
@@ -14366,7 +14361,6 @@ int main(int,char**) {
                     ApplyTextureSettingsAction(TextureSettings::Action::FocusPrevious);
                 if (kNav&(HidNpadButton_Down|HidNpadButton_StickLDown|HidNpadButton_StickRDown))
                     ApplyTextureSettingsAction(TextureSettings::Action::FocusNext);
-                // Preserve legacy input priority: Right, then Left, then A.
                 if (kNav&(HidNpadButton_Right|HidNpadButton_StickLRight|HidNpadButton_StickRRight))
                     ApplyTextureSettingsAction(TextureSettings::Action::NextValue);
                 else if (kNav&(HidNpadButton_Left|HidNpadButton_StickLLeft|HidNpadButton_StickRLeft))

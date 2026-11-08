@@ -1,5 +1,4 @@
-// Host-only regression checks; no SDL, libnx, filesystem, or real saves required.
-// Build/run instructions: see tests/README.md.
+// Host checks; see tests/README.md.
 #include "texture_settings.h"
 
 #include <cstdio>
@@ -23,8 +22,6 @@ static bool SamePreferences(const State& a, const State& b) {
 }
 
 static void CheckNavigation() {
-    // Every dependency combination must keep focus valid, stop at boundaries,
-    // and traverse the same enabled rows forward and backward.
     for (auto encoder : {Bc1Encoder::Custom, Bc1Encoder::PCA}) {
         for (auto fit : {FitMode::Cover, FitMode::Contain, FitMode::Fill}) {
             State s;

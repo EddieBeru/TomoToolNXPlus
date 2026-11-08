@@ -2,8 +2,7 @@
 
 #include "texture_processor.h"
 
-// Pure preference and focus transitions. Rendering, controller decoding, config
-// persistence, and game-save operations belong to the caller.
+// Preference and focus transitions; no I/O.
 namespace TextureSettings {
 
 enum class Row { Shape, Encoder, Bc1Mode, Fit, Background, Count };
@@ -22,16 +21,14 @@ struct State {
 
 bool IsEnabled(const State& state, Row row);
 int ValueCount(Row row);
-// Custom matte colors retain the legacy display/cycling fallback to index zero.
+// Custom matte colors use index zero for display/cycling.
 int ValueIndex(const State& state, Row row);
 
-// Repair unavailable focus after loading or externally changing preferences.
-// Prefer the next enabled row, falling back to the previous one.
+// Repair disabled focus: prefer the next enabled row, then the previous.
 void NormalizeFocus(State& state);
 void FocusRow(State& state, Row row);
 
-// Return true only when preferences actually change, so the caller can persist
-// once. Focus-only changes and invalid/disabled selections return false.
+// True only on preference changes; focus-only changes return false.
 bool SelectValue(State& state, Row row, int value);
 bool Apply(State& state, Action action);
 

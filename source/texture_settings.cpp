@@ -15,8 +15,7 @@ struct RowDefinition {
 
 bool AlwaysEnabled(const State&) { return true; }
 
-// Order matches Row. Keep availability, choices, and legacy activation behavior
-// together, shared by navigation, touch, and rendering.
+// Indexed by Row; A cycles only Shape and Encoder (legacy behavior).
 const RowDefinition kRows[] = {
     {3, true, AlwaysEnabled,
      [](const State& s) { return static_cast<int>(s.canvasShape); },
