@@ -65,6 +65,12 @@ static void CheckDependencyChangesAndTouch() {
     CHECK(s.focus == Row::Fit);
     CHECK(s.bc1Mode == Bc1Mode::ThreeColor);
 
+    s.encoder = Bc1Encoder::Custom;
+    FocusRow(s, Row::Bc1Mode);
+    CHECK(SelectValue(s, Row::Encoder, 1)); // touch changes dependency and owns focus
+    CHECK(s.focus == Row::Encoder && !IsEnabled(s, Row::Bc1Mode));
+    CHECK(s.bc1Mode == Bc1Mode::ThreeColor);
+
     s.fitMode = FitMode::Contain;
     s.matte = {255, 255, 255, 255};
     FocusRow(s, Row::Background);

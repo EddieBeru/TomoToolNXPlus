@@ -10,6 +10,7 @@
 #include "save_mount.h"
 #include "http_server.h"
 #include "texture_processor.h"
+#include "texture_settings.h"
 #include "ugc_scanner.h"
 #include "backup.h"
 #include "mii_manager.h"
@@ -1075,14 +1076,8 @@ static std::string  gPreviewStem;
 static std::string  gOnSwitchMsg;
 static SDL_Color    gOnSwitchMsgCol = COL_TEXT;
 static bool         gPreviewNoSrgb  = false; // color encoding toggle: false=sRGB, true=Linear
-static TextureProcessor::Bc1Encoder gEncMode = TextureProcessor::Bc1Encoder::Custom;
-static TextureProcessor::Bc1Mode    gBc1Mode = TextureProcessor::Bc1Mode::Auto;
-static TextureProcessor::FitMode    gFitMode = TextureProcessor::FitMode::Cover;
-// Default canvas shape applied to every UGC import. Square is correct for
-// most slots; Book/Tv are manual overrides because byte-count detection
-// alone can't tell which mesh a given slot is bound to.
-static TextureProcessor::CanvasShape gCanvasShape = TextureProcessor::CanvasShape::Square;
-static TextureProcessor::Matte      gMatte;            // transparent by default
+// Texture import preferences and settings focus; transitions live in the model.
+static TextureSettings::State gTextureSettings;
 
 // File browser
 struct BrowseEntry { std::string name; bool isDir; };
@@ -1293,8 +1288,6 @@ static int  gMaxBackups        = 5;
 
 
 static int         gSettingsSel    = 0;
-// TexSettings (texture-tab encoding drawer) selection: 0=Encoder, 1=BC1 Mode
-static int         gTexSettingsSel = 0;
 static std::string gSettingsMsg;
 static SDL_Color   gSettingsMsgCol = COL_TEXT;
 
@@ -1319,7 +1312,9 @@ static void TSelSettingsItem(int i) { gSettingsSel = i; }
 static void TSettingsRowLeft (int row) { gSettingsSel = row; gSimKDown |= HidNpadButton_Left;  }
 static void TSettingsRowRight(int row) { gSettingsSel = row; gSimKDown |= HidNpadButton_Right; }
 static void TSettingsRowA    (int row) { gSettingsSel = row; gSimKDown |= HidNpadButton_A;     }
-static void TSelTexSettingsItem(int i) { gTexSettingsSel = i; }
+static void TSelTexSettingsItem(int i) {
+    TextureSettings::FocusRow(gTextureSettings, static_cast<TextureSettings::Row>(i));
+}
 static void TRestorePickSel(int i)  { gRestoreSel  = i; }
 static void TRestoreConfirmA(int)   { gSimKDown |= HidNpadButton_A; }
 static void TRestoreConfirmB(int)   { gSimKDown |= HidNpadButton_B; }
@@ -4059,11 +4054,11 @@ static void DoOnSwitchImport(const std::string& pngPath) {
     opts.noSrgb             = gPreviewNoSrgb;
     opts.originalUgctexPath = gEntries[gEntrySel].ugctexPath;
     opts.originalCanvasPath = gEntries[gEntrySel].canvasPath;
-    opts.canvasShape        = gCanvasShape;
-    opts.encoder            = gEncMode;
-    opts.bc1Mode            = gBc1Mode;
-    opts.fitMode            = gFitMode;
-    opts.matte              = gMatte;
+    opts.canvasShape        = gTextureSettings.canvasShape;
+    opts.encoder            = gTextureSettings.encoder;
+    opts.bc1Mode            = gTextureSettings.bc1Mode;
+    opts.fitMode            = gTextureSettings.fitMode;
+    opts.matte              = gTextureSettings.matte;
 
     LogINF("Importing "+stem+"...");
     std::string err = TextureProcessor::ImportPng(opts);
@@ -4160,20 +4155,19 @@ static void TUgcActivateBtn(int) {
 }
 // Touch entry-point: focus the tapped button, then run it.
 static void TUgcBtnTap(int i) { gUgcBtnSel = i; TUgcActivateBtn(0); }
-static void TSetEncMode(int v) { gEncMode = (TextureProcessor::Bc1Encoder)v; SaveConfig(); }
-static void TSetBc1Mode(int v) { gBc1Mode = (TextureProcessor::Bc1Mode)v; SaveConfig(); }
-static void TSetFitMode(int v) { gFitMode = (TextureProcessor::FitMode)v; SaveConfig(); }
-static void TSetCanvasShape(int v) {
-    gCanvasShape = (TextureProcessor::CanvasShape)v; SaveConfig();
+// UI adapters persist only actual preference changes. The model owns validation,
+// availability, and focus for both controller actions and touch selections.
+static void ApplyTextureSettingsAction(TextureSettings::Action action) {
+    if (TextureSettings::Apply(gTextureSettings, action)) SaveConfig();
 }
-// Three matte presets for on-Switch. The WebUI has a full hex picker; on a
-// controller a 3-button stepper covers the typical cases without keyboard.
-static void TSetMatte  (int v) {
-    if      (v == 0) gMatte = TextureProcessor::Matte{};                 // transparent
-    else if (v == 1) gMatte = TextureProcessor::Matte{255, 255, 255, 255}; // white
-    else             gMatte = TextureProcessor::Matte{  0,   0,   0, 255}; // black
-    SaveConfig();
+static void SelectTextureSettingsValue(TextureSettings::Row row, int value) {
+    if (TextureSettings::SelectValue(gTextureSettings, row, value)) SaveConfig();
 }
+static void TSetEncMode(int v) { SelectTextureSettingsValue(TextureSettings::Row::Encoder, v); }
+static void TSetBc1Mode(int v) { SelectTextureSettingsValue(TextureSettings::Row::Bc1Mode, v); }
+static void TSetFitMode(int v) { SelectTextureSettingsValue(TextureSettings::Row::Fit, v); }
+static void TSetCanvasShape(int v) { SelectTextureSettingsValue(TextureSettings::Row::Shape, v); }
+static void TSetMatte(int v) { SelectTextureSettingsValue(TextureSettings::Row::Background, v); }
 
 // + Blank UGC handler. Kind is derived from the current category filter
 // (gUgcFilter / the kind picker) when set, otherwise defaults to MapObject
@@ -4221,7 +4215,7 @@ static void TDoCreateBlankUgc(int kindArg) {
         opts.writeCanvas = true;
         opts.writeThumb  = true;
         opts.noSrgb      = false;
-        opts.canvasShape = gCanvasShape;
+        opts.canvasShape = gTextureSettings.canvasShape;
         std::string werr = TextureProcessor::ImportRgbaImage(white, opts);
         if (!werr.empty()) {
             gOnSwitchMsg = werr;
@@ -5497,30 +5491,30 @@ static void LoadConfig() {
         if (key == "mtp_warn_acked")   gMtpWarningAcked  = (val == "1");
         if (key == "max_backups")    { int v = atoi(val.c_str()); if (v >= 1 && v <= 99) gMaxBackups = v; }
         if (key == "encoder") {
-            if      (val == "custom") gEncMode = TextureProcessor::Bc1Encoder::Custom;
-            else if (val == "pca")         gEncMode = TextureProcessor::Bc1Encoder::PCA;
+            if      (val == "custom") gTextureSettings.encoder = TextureProcessor::Bc1Encoder::Custom;
+            else if (val == "pca")         gTextureSettings.encoder = TextureProcessor::Bc1Encoder::PCA;
         }
         if (key == "bc1_mode") {
-            if      (val == "auto")     gBc1Mode = TextureProcessor::Bc1Mode::Auto;
-            else if (val == "4color")   gBc1Mode = TextureProcessor::Bc1Mode::FourColor;
-            else if (val == "3color")   gBc1Mode = TextureProcessor::Bc1Mode::ThreeColor;
+            if      (val == "auto")     gTextureSettings.bc1Mode = TextureProcessor::Bc1Mode::Auto;
+            else if (val == "4color")   gTextureSettings.bc1Mode = TextureProcessor::Bc1Mode::FourColor;
+            else if (val == "3color")   gTextureSettings.bc1Mode = TextureProcessor::Bc1Mode::ThreeColor;
         }
         if (key == "fit_mode") {
-            if      (val == "cover")    gFitMode = TextureProcessor::FitMode::Cover;
-            else if (val == "contain")  gFitMode = TextureProcessor::FitMode::Contain;
-            else if (val == "fill")     gFitMode = TextureProcessor::FitMode::Fill;
+            if      (val == "cover")    gTextureSettings.fitMode = TextureProcessor::FitMode::Cover;
+            else if (val == "contain")  gTextureSettings.fitMode = TextureProcessor::FitMode::Contain;
+            else if (val == "fill")     gTextureSettings.fitMode = TextureProcessor::FitMode::Fill;
         }
         if (key == "canvas_shape") {
-            if      (val == "square") gCanvasShape = TextureProcessor::CanvasShape::Square;
-            else if (val == "book")   gCanvasShape = TextureProcessor::CanvasShape::Book;
-            else if (val == "tv")     gCanvasShape = TextureProcessor::CanvasShape::Tv;
+            if      (val == "square") gTextureSettings.canvasShape = TextureProcessor::CanvasShape::Square;
+            else if (val == "book")   gTextureSettings.canvasShape = TextureProcessor::CanvasShape::Book;
+            else if (val == "tv")     gTextureSettings.canvasShape = TextureProcessor::CanvasShape::Tv;
         }
         if (key == "matte") {
             // Format: "transparent" or "rrggbb" hex; empty/invalid → transparent.
-            if (val == "transparent") gMatte = TextureProcessor::Matte{};
+            if (val == "transparent") gTextureSettings.matte = TextureProcessor::Matte{};
             else if (val.size() == 6) {
                 auto h=[&](int o){int v=0;for(int i=0;i<2;i++){char c=val[o+i];v<<=4;if(c>='0'&&c<='9')v|=c-'0';else if(c>='a'&&c<='f')v|=c-'a'+10;else if(c>='A'&&c<='F')v|=c-'A'+10;}return (uint8_t)v;};
-                gMatte = {h(0),h(2),h(4),255};
+                gTextureSettings.matte = {h(0),h(2),h(4),255};
             }
         }
         if (key == "language") {
@@ -5559,20 +5553,20 @@ static void SaveConfig() {
     fprintf(f, "mtp_warn_acked=%d\n",  gMtpWarningAcked  ? 1 : 0);
     fprintf(f, "max_backups=%d\n",     gMaxBackups);
     fprintf(f, "encoder=%s\n",
-            gEncMode == TextureProcessor::Bc1Encoder::Custom ? "custom" : "pca");
+            gTextureSettings.encoder == TextureProcessor::Bc1Encoder::Custom ? "custom" : "pca");
     fprintf(f, "bc1_mode=%s\n",
-            gBc1Mode == TextureProcessor::Bc1Mode::Auto      ? "auto" :
-            gBc1Mode == TextureProcessor::Bc1Mode::FourColor ? "4color" : "3color");
+            gTextureSettings.bc1Mode == TextureProcessor::Bc1Mode::Auto      ? "auto" :
+            gTextureSettings.bc1Mode == TextureProcessor::Bc1Mode::FourColor ? "4color" : "3color");
     fprintf(f, "fit_mode=%s\n",
-            gFitMode == TextureProcessor::FitMode::Cover   ? "cover" :
-            gFitMode == TextureProcessor::FitMode::Contain ? "contain" : "fill");
+            gTextureSettings.fitMode == TextureProcessor::FitMode::Cover   ? "cover" :
+            gTextureSettings.fitMode == TextureProcessor::FitMode::Contain ? "contain" : "fill");
     fprintf(f, "canvas_shape=%s\n",
-            gCanvasShape == TextureProcessor::CanvasShape::Square ? "square" :
-            gCanvasShape == TextureProcessor::CanvasShape::Book   ? "book"   : "tv");
-    if (gMatte.a == 0) {
+            gTextureSettings.canvasShape == TextureProcessor::CanvasShape::Square ? "square" :
+            gTextureSettings.canvasShape == TextureProcessor::CanvasShape::Book   ? "book"   : "tv");
+    if (gTextureSettings.matte.a == 0) {
         fprintf(f, "matte=transparent\n");
     } else {
-        fprintf(f, "matte=%02x%02x%02x\n", gMatte.r, gMatte.g, gMatte.b);
+        fprintf(f, "matte=%02x%02x%02x\n", gTextureSettings.matte.r, gTextureSettings.matte.g, gTextureSettings.matte.b);
     }
     fprintf(f, "language=%s\n", Lang::Current().c_str());
     fprintf(f, "theme=%s\n",    ThemeNS::Current().c_str());
@@ -5631,6 +5625,7 @@ static void DrawFileBrowser() {
 
 // ─── Texture encoding settings tab ───────────────────────────────────────────
 static void DrawTexSettings() {
+    using Row = TextureSettings::Row;
     HitClear();
     SDL_SetRenderDrawColor(gRen, COL_BG.r, COL_BG.g, COL_BG.b, 255);
     SDL_RenderClear(gRen);
@@ -5662,37 +5657,41 @@ static void DrawTexSettings() {
         DrawTabUnderline(0);
     }
 
-    // Content area — four compact rows (Encoder, BC1 mode, Fit, Background),
-    // matching the WebUI's pill-button style: legend on the left, pill buttons
-    // on the right, one-line hint below.
+    // Shape, Encoder, BC1 Mode, Fit, and Background share the model's row order
+    // and availability rules. Keep the existing pill-button presentation.
     const int contentX = (SCREEN_W - 720) / 2;
     const int contentY = 68;
     const int sectionW = 720;
     const int rowH     = 62;
     const int rowGap   = 8;
 
-    auto drawPillRow = [&](int rowIdx, int sy, const std::string& label,
-                           const std::string& hint, bool disabled) -> void {
-        bool selRow = (gTexSettingsSel == rowIdx);
+    auto rowY = [&](Row row) { return contentY + static_cast<int>(row) * (rowH + rowGap); };
+    auto drawPillRow = [&](Row row, int sy, const std::string& label,
+                           const std::string& hint) -> void {
+        const bool disabled = !TextureSettings::IsEnabled(gTextureSettings, row);
+        bool selRow = (gTextureSettings.focus == row);
         SDL_Color bg = selRow ? COL_SEL : COL_PANEL;
         SDL_Color br = disabled ? SDL_Color{45,45,45,255}
                                 : (selRow ? COL_GOLD : COL_BORDER);
         FillRect(contentX, sy, sectionW, rowH, bg);
         DrawRect(contentX, sy, sectionW, rowH, br);
-        HitAdd(contentX, sy, sectionW, rowH, TSelTexSettingsItem, rowIdx);
+        if (!disabled)
+            HitAdd(contentX, sy, sectionW, rowH, TSelTexSettingsItem, static_cast<int>(row));
         SDL_Color lblCol = disabled ? COL_DIM : (selRow ? COL_TEXT : COL_DIM);
         SDL_Color dscCol = disabled ? SDL_Color{55,55,55,255} : COL_DIM;
         DrawText(label, contentX + 16, sy + 8,  lblCol, Font::Md);
         DrawText(hint,  contentX + 16, sy + 36, dscCol, Font::Sm);
     };
 
-    auto drawPills = [&](int sy, int btnCount, int btnW, int btnH,
-                         int curIdx, bool disabled, int rowIdx,
+    auto drawPills = [&](Row row, int sy, int btnW, int btnH,
                          const char* const* names, TouchFn cb) -> void {
+        const int btnCount = TextureSettings::ValueCount(row);
+        const int curIdx = TextureSettings::ValueIndex(gTextureSettings, row);
+        const bool disabled = !TextureSettings::IsEnabled(gTextureSettings, row);
         const int btnGap = 6;
         int bx = contentX + sectionW - btnCount*(btnW+btnGap) - 10;
         int by = sy + (rowH - btnH) / 2;
-        bool selRow = (gTexSettingsSel == rowIdx);
+        bool selRow = (gTextureSettings.focus == row);
         for (int k = 0; k < btnCount; k++) {
             bool on = (!disabled && curIdx == k);
             SDL_Color bg = disabled ? SDL_Color{30,30,30,255}
@@ -5714,69 +5713,65 @@ static void DrawTexSettings() {
     // broken in-game results — much higher impact than tweaking encoder
     // settings, which only affect quality.
     {
-        int sy = contentY;
+        int sy = rowY(Row::Shape);
         std::string hint =
-            (gCanvasShape == TextureProcessor::CanvasShape::Square) ? Lang::T("settings.shape.hint.square") :
-            (gCanvasShape == TextureProcessor::CanvasShape::Book)   ? Lang::T("settings.shape.hint.book")   :
+            (gTextureSettings.canvasShape == TextureProcessor::CanvasShape::Square) ? Lang::T("settings.shape.hint.square") :
+            (gTextureSettings.canvasShape == TextureProcessor::CanvasShape::Book)   ? Lang::T("settings.shape.hint.book")   :
                                                                        Lang::T("settings.shape.hint.tv");
-        drawPillRow(0, sy, Lang::T("settings.shape"), hint, false);
+        drawPillRow(Row::Shape, sy, Lang::T("settings.shape"), hint);
         // "TV wide" because the wide canvas isn't only for TVs — same shape
         // is what posters, signs, paintings, and any other wide-display
         // mesh wants.
         const char* names[] = { "Square", "Book", "TV wide" };
-        drawPills(sy, 3, 96, 28, (int)gCanvasShape, false, 0, names, TSetCanvasShape);
+        drawPills(Row::Shape, sy, 96, 28, names, TSetCanvasShape);
     }
 
     // ── Row 1: Encoder ──────────────────────────────────────────────────────
     {
-        int sy = contentY + (rowH + rowGap);
-        std::string hint = (gEncMode == TextureProcessor::Bc1Encoder::Custom)
+        int sy = rowY(Row::Encoder);
+        std::string hint = (gTextureSettings.encoder == TextureProcessor::Bc1Encoder::Custom)
             ? Lang::T("settings.encoder.hint.custom")
             : Lang::T("settings.encoder.hint.pca");
-        drawPillRow(1, sy, Lang::T("settings.encoder"), hint, false);
+        drawPillRow(Row::Encoder, sy, Lang::T("settings.encoder"), hint);
         const char* names[] = { "Gamma-aware", "PCA" };
-        drawPills(sy, 2, 130, 28, (int)gEncMode, false, 1, names, TSetEncMode);
+        drawPills(Row::Encoder, sy, 130, 28, names, TSetEncMode);
     }
 
     // ── Row 2: BC1 Mode ──────────────────────────────────────────────────────
     {
-        bool disabled = (gEncMode != TextureProcessor::Bc1Encoder::Custom);
-        int sy = contentY + 2 * (rowH + rowGap);
+        bool disabled = !TextureSettings::IsEnabled(gTextureSettings, Row::Bc1Mode);
+        int sy = rowY(Row::Bc1Mode);
         std::string hint = disabled ? Lang::T("settings.bc1.disabled") :
-            (gBc1Mode == TextureProcessor::Bc1Mode::Auto)       ? Lang::T("settings.bc1.hint.auto") :
-            (gBc1Mode == TextureProcessor::Bc1Mode::FourColor)  ? Lang::T("settings.bc1.hint.fourColor") :
+            (gTextureSettings.bc1Mode == TextureProcessor::Bc1Mode::Auto)       ? Lang::T("settings.bc1.hint.auto") :
+            (gTextureSettings.bc1Mode == TextureProcessor::Bc1Mode::FourColor)  ? Lang::T("settings.bc1.hint.fourColor") :
                                                                    Lang::T("settings.bc1.hint.threeColor");
-        drawPillRow(2, sy, Lang::T("settings.bc1"), hint, disabled);
+        drawPillRow(Row::Bc1Mode, sy, Lang::T("settings.bc1"), hint);
         const char* names[] = { "Auto", "4-color", "3-color" };
-        drawPills(sy, 3, 80, 28, (int)gBc1Mode, disabled, 2, names, TSetBc1Mode);
+        drawPills(Row::Bc1Mode, sy, 80, 28, names, TSetBc1Mode);
     }
 
     // ── Row 3: Fit mode ──────────────────────────────────────────────────────
     {
-        int sy = contentY + 3 * (rowH + rowGap);
+        int sy = rowY(Row::Fit);
         std::string hint =
-            (gFitMode == TextureProcessor::FitMode::Cover)   ? Lang::T("settings.fit.hint.cover")   :
-            (gFitMode == TextureProcessor::FitMode::Contain) ? Lang::T("settings.fit.hint.contain") :
+            (gTextureSettings.fitMode == TextureProcessor::FitMode::Cover)   ? Lang::T("settings.fit.hint.cover")   :
+            (gTextureSettings.fitMode == TextureProcessor::FitMode::Contain) ? Lang::T("settings.fit.hint.contain") :
                                                                 Lang::T("settings.fit.hint.fill");
-        drawPillRow(3, sy, Lang::T("settings.fit"), hint, false);
+        drawPillRow(Row::Fit, sy, Lang::T("settings.fit"), hint);
         const char* names[] = { "Cover", "Contain", "Fill" };
-        drawPills(sy, 3, 80, 28, (int)gFitMode, false, 3, names, TSetFitMode);
+        drawPills(Row::Fit, sy, 80, 28, names, TSetFitMode);
     }
 
     // ── Row 4: Background (matte) — only relevant when Fit == Contain ───────
     {
-        bool disabled = (gFitMode != TextureProcessor::FitMode::Contain);
-        int sy = contentY + 4 * (rowH + rowGap);
-        int matteIdx = (gMatte.a == 0)                       ? 0
-                     : (gMatte.r==255 && gMatte.g==255 && gMatte.b==255) ? 1
-                     : (gMatte.r==0   && gMatte.g==0   && gMatte.b==0)   ? 2
-                                                                          : 0;
+        bool disabled = !TextureSettings::IsEnabled(gTextureSettings, Row::Background);
+        int sy = rowY(Row::Background);
         std::string hint = disabled
             ? Lang::T("settings.matte.disabled")
             : Lang::T("settings.matte.desc");
-        drawPillRow(4, sy, Lang::T("settings.matte"), hint, disabled);
+        drawPillRow(Row::Background, sy, Lang::T("settings.matte"), hint);
         const char* names[] = { "Transparent", "White", "Black" };
-        drawPills(sy, 3, 96, 28, matteIdx, disabled, 4, names, TSetMatte);
+        drawPills(Row::Background, sy, 96, 28, names, TSetMatte);
     }
 
     DrawFooter(Lang::T("settings.footer"));
@@ -11214,7 +11209,7 @@ static void TConfirmBgRemove(int) {
     opts.noSrgb             = gPreviewNoSrgb;
     opts.originalUgctexPath = e.ugctexPath;
     opts.originalCanvasPath = e.canvasPath;
-    opts.canvasShape        = gCanvasShape;
+    opts.canvasShape        = gTextureSettings.canvasShape;
     err = TextureProcessor::ImportRgbaImage(img, opts);
     if (!err.empty()) { gOnSwitchMsg = err; gOnSwitchMsgCol = COL_RED; return; }
 
@@ -12194,64 +12189,6 @@ static void FinishBundleApply(int userIdx) {
     } else {
         gScreen = Screen::BackupPrompt;
     }
-}
-
-// Nuevas implementaciones
-static void TexRow0_Step(int dir) {
-    if (dir == -99) //Sin pulsaciones
-        return;
-    
-
-    int cur = (int)gCanvasShape;
-    if (dir >= 0) 
-        cur = (cur + 1) % 3;
-    else     
-        cur = (cur + 2) % 3;
-
-    gCanvasShape = (TextureProcessor::CanvasShape)cur;
-    SaveConfig();
-}
-
-static void TexRow1_Step(int dir) {
-    if (dir == -99) //Sin pulsaciones
-        return;
-    
-    gEncMode = (gEncMode == TextureProcessor::Bc1Encoder::Custom)
-        ? TextureProcessor::Bc1Encoder::PCA
-        : TextureProcessor::Bc1Encoder::Custom;
-    SaveConfig();
-}
-
-static void TexRow2_Step(int dir) {
-    if (dir == 0 || dir == -99) //Sin pulsaciones
-        return;
-    
-    int cur = (int)gBc1Mode;
-    if (dir > 0) cur = (cur + 1) % 3;
-    if (dir < 0)  cur = (cur + 2) % 3;
-    if (dir != 0) { gBc1Mode = (TextureProcessor::Bc1Mode)cur; SaveConfig(); }
-}
-
-static void TexRow3_Step(int dir) {
-    if (dir == -99) //Sin pulsaciones
-        return;
-    
-    int cur = (int)gFitMode;
-    if (dir > 0) cur = (cur + 1) % 3;
-    if (dir < 0)  cur = (cur + 2) % 3;
-    if (dir != 0) { gFitMode = (TextureProcessor::FitMode)cur; SaveConfig(); }
-}
-
-static void TexRow4_Step(int dir) {
-    if (dir == 0 || dir == -99) //Sin pulsaciones
-        return;
-    
-    int cur = (gMatte.a == 0) ? 0
-            : (gMatte.r == 255 && gMatte.g == 255 && gMatte.b == 255) ? 1
-            : (gMatte.r == 0   && gMatte.g == 0   && gMatte.b == 0)   ? 2 : 0;
-    if (dir > 0) cur = (cur + 1) % 3;
-    else cur = (cur + 2) % 3;
-    TSetMatte(cur);
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -14417,44 +14354,26 @@ int main(int,char**) {
                 }
 
             } else if (gOnSwitchMode == OnSwitchMode::TexSettings) {
-                // TexSettings: tab switching plus joystick-driven adjustment of the
-                // two encoding settings (Encoder + BC1 Mode).
+                // Legacy tab/back bindings remain until the global navigation feature.
+                TextureSettings::NormalizeFocus(gTextureSettings);
                 if (kDown&HidNpadButton_L) {
                     gOnSwitchMode=OnSwitchMode::WebUI; gOnSwitchMsg=""; break;
                 }
                 if (kDown&HidNpadButton_R) {
                     gOnSwitchMode=OnSwitchMode::UGC; gOnSwitchMsg=""; break;
                 }
-                // Row navigation: 0 = Shape, 1 = Encoder, 2 = BC1 Mode,
-                // 3 = Fit, 4 = Background.
                 if (kNav&(HidNpadButton_Up|HidNpadButton_StickLUp|HidNpadButton_StickRUp))
-                    gTexSettingsSel = std::max(0, gTexSettingsSel - 1);
+                    ApplyTextureSettingsAction(TextureSettings::Action::FocusPrevious);
                 if (kNav&(HidNpadButton_Down|HidNpadButton_StickLDown|HidNpadButton_StickRDown))
-                    gTexSettingsSel = std::min(4, gTexSettingsSel + 1);
-                bool left  = (kNav&(HidNpadButton_Left |HidNpadButton_StickLLeft |HidNpadButton_StickRLeft))  != 0;
-                bool right = (kNav&(HidNpadButton_Right|HidNpadButton_StickLRight|HidNpadButton_StickRRight)) != 0;
-                bool a     = (kDown&HidNpadButton_A) != 0;
-                int dir    = (right ? 1 : (left ? -1 : a ? 0 : -99));
-                
-                // Row 0: Canvas shape — cycle Square -> Book -> TV.
-                if (gTexSettingsSel == 0)
-                    TexRow0_Step(dir);
-                // Row 1: Encoder — Left/Right (and A) toggle Custom <-> PCA.
-                if (gTexSettingsSel == 1 && (left || right || a)) {
-                    TexRow1_Step(dir);
-                }
-                // Row 2: BC1 Mode — active only with Custom encoder.
-                if (gTexSettingsSel == 2 && gEncMode == TextureProcessor::Bc1Encoder::Custom) {
-                    TexRow2_Step(dir);
-                }
-                // Row 3: Fit mode — cycle Cover -> Contain -> Fill.
-                if (gTexSettingsSel == 3) {
-                    TexRow3_Step(dir);
-                }
-                // Row 4: Background — Transparent / White / Black, only with Contain.
-                if (gTexSettingsSel == 4 && gFitMode == TextureProcessor::FitMode::Contain) {
-                    TexRow4_Step(dir);
-                }
+                    ApplyTextureSettingsAction(TextureSettings::Action::FocusNext);
+                // Preserve legacy input priority: Right, then Left, then A.
+                if (kNav&(HidNpadButton_Right|HidNpadButton_StickLRight|HidNpadButton_StickRRight))
+                    ApplyTextureSettingsAction(TextureSettings::Action::NextValue);
+                else if (kNav&(HidNpadButton_Left|HidNpadButton_StickLLeft|HidNpadButton_StickRLeft))
+                    ApplyTextureSettingsAction(TextureSettings::Action::PreviousValue);
+                else if (kDown&HidNpadButton_A)
+                    ApplyTextureSettingsAction(TextureSettings::Action::Activate);
+
                 // B backs out of the settings drawer to the texture tab it was
                 // opened from (the gear that opens it lives there) — more
                 // intuitive than pressing L/R to some other tab to leave.
