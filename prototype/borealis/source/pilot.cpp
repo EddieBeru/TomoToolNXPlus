@@ -127,7 +127,7 @@ public:
             }
             addAction(list, "pilot/tabs"_i18n, "", [this](brls::View*) { focusSidebar(); });
             pages[i] = scroll(list);
-            pages[i]->registerAction("pilot/tabs"_i18n, brls::BUTTON_B,
+            pages[i]->registerAction("pilot/tabs_hint"_i18n, brls::BUTTON_B,
                 [this](brls::View*) { focusSidebar(); return true; }, false, false, brls::SOUND_BACK);
         }
 

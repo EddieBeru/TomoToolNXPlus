@@ -30,5 +30,6 @@
   "sample_2": "Example Mii",
   "sample_3": "Example player",
   "sample_4": "Example island",
-  "sample_note": "This is fictional sample data. Open Texture Settings in the Textures tab to try the demo controls."
+  "sample_note": "This is fictional sample data. Open Texture Settings in the Textures tab to try the demo controls.",
+  "tabs_hint": "Tab list"
 }

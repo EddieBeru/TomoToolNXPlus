@@ -1,3 +1,4 @@
 # Preserve the pinned upstream snapshot byte for byte.
 libs/borealis/** -text
-prototype/borealis/resources/legal/borealis-{AUTHORS,NOTICE}.txt -text
+prototype/borealis/resources/legal/borealis-AUTHORS.txt -text
+prototype/borealis/resources/legal/borealis-NOTICE.txt -text

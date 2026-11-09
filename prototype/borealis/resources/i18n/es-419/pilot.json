@@ -18,8 +18,8 @@
   "contain": "Mostrar imagen completa",
   "fill": "Estirar",
   "tabs": "Volver a la lista de secciones",
-  "previous_tab": "Sección anterior",
-  "next_tab": "Sección siguiente",
+  "previous_tab": "Anterior",
+  "next_tab": "Siguiente",
   "exit": "Salir del piloto",
   "shirt": "Camisa de ejemplo",
   "room": "Habitación de ejemplo",
@@ -30,5 +30,6 @@
   "sample_2": "Mii de ejemplo",
   "sample_3": "Jugador de ejemplo",
   "sample_4": "Isla de ejemplo",
-  "sample_note": "Estos datos de ejemplo son ficticios. Abre Ajustes de texturas en la sección Texturas para probar los controles."
+  "sample_note": "Estos datos de ejemplo son ficticios. Abre Ajustes de texturas en la sección Texturas para probar los controles.",
+  "tabs_hint": "Secciones"
 }
