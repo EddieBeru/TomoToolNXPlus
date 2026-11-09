@@ -1,7 +1,7 @@
 # Complete the texture-settings refactor
 
-Status: implemented. Host regression checks and the Switch build passed.
-Physical Switch and emulator interaction checks remain unverified. The findings
+Status: implemented. Host regression checks, the Switch build, and user-reported
+emulator checks passed. Physical Switch testing remains pending. The findings
 below describe the starting state; completion details are recorded at the end.
 
 ## Goal and scope
@@ -120,7 +120,11 @@ integration, and visual redesign belong to that separately reviewed feature unde
   background-removal entry points were checked against the starting version:
   only preference-field access changed in those functions. CRLF line endings in
   `main.cpp` were preserved.
-- No personal saves were used or modified. The host checks do not establish
+- User-reported emulator checks passed on 2026-11-08: navigation skips BC1 Mode
+  with PCA, Down stays on Fit when Background is disabled, Contain enables
+  Background, enabled option taps update value and row focus, disabled row taps
+  have no effect, and B returns to Textures. Emulator/version was not specified.
+- Automated checks used no personal saves. The host checks do not establish
   physical input, rendering, config I/O, or game-save compatibility. On-device
   review still needs to check disabled-row visuals, touch hit areas, switching
   between touch and controller, repeat behavior, and B returning to Textures.
