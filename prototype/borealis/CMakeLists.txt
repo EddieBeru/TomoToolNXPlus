@@ -19,7 +19,8 @@ add_subdirectory("${BOREALIS_LIBRARY}" borealis EXCLUDE_FROM_ALL)
 # Borealis uses dynamic_cast and exceptions; the production Makefile stays unchanged.
 target_compile_options(borealis PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-frtti;-fexceptions>)
 
-add_executable(TomoToolNXBorealis source/main.cpp)
+add_executable(TomoToolNXBorealis source/main.cpp
+    "${BOREALIS_LIBRARY}/lib/platforms/switch/switch_wrapper.c")
 target_link_libraries(TomoToolNXBorealis PRIVATE borealis)
 target_link_options(TomoToolNXBorealis PRIVATE
     "-Wl,--gc-sections,-Map,${CMAKE_CURRENT_BINARY_DIR}/TomoToolNXBorealis.map")
