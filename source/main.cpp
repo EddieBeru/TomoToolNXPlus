@@ -5656,7 +5656,7 @@ static void DrawTextureSettingsActionPrompt(ControllerPrompts::Icon icon,
     int labelW = 0, labelH = 0;
     if (TTF_Font* font = GetFont(Font::Sm))
         TTF_SizeUTF8(font, label.c_str(), &labelW, &labelH);
-    const int iconSize = 22;
+    const int iconSize = 34;
     const int gap = 8;
     const int promptW = (ControllerPrompts::Available(icon) ? iconSize : 0)
                       + (ControllerPrompts::Available(icon) ? gap : 0) + labelW;
@@ -5682,7 +5682,7 @@ static void DrawTextureSettingsFooter(bool editing) {
     int labelW = 0, labelH = 0;
     if (TTF_Font* font = GetFont(Font::Sm))
         TTF_SizeUTF8(font, label.c_str(), &labelW, &labelH);
-    const int iconSize = 20, iconGap = 5, textGap = 10;
+    const int iconSize = 28, iconGap = 6, textGap = 10;
     const int totalW = iconSize * 2 + iconGap + textGap + labelW;
     int x = (SCREEN_W - totalW) / 2;
     const int cy = SCREEN_H - 15;
