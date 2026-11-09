@@ -1,7 +1,7 @@
 # Borealis Switch pilot
 
-This is an independent UI experiment with synthetic data, built to evaluate
-Borealis before considering a migration of the Switch interface. It does not
+This is an independent Switch UI migration target. Browser tabs use synthetic
+data; Texture Settings v0.2.0 edits the real application preferences. It does not
 replace the current application. WebUI is outside its scope.
 
 ## Build
@@ -34,50 +34,35 @@ input and event loop. RTTI and exceptions are enabled only in this separate
 build. The existing SDL renderer and production compiler flags are unchanged.
 Deko3D is not used: the earlier evaluation could not find `glm/vec2.hpp`.
 
-## Isolation
+## Scope and isolation
 
-The executable links only the prototype and Borealis/platform dependencies.
-It does not link or call the application's SaveMount, SaveEditor, SaveWorkflow,
-configuration, HTTP server or any other production module. It does not mount
-user saves or persist settings. Its resources are separate from production
-ROMFS and contain no personal data. Borealis initializes platform services,
-reads the system language/theme/fonts and loads only its own ROMFS resources.
+The root destinations remain WebUI, Textures, Mii, Player and Map. Textures opens
+the real Texture Settings as a child. The other pages and texture slots remain
+samples. The current NRO version is 0.2.0, authored by EddieBeru.
 
-The system's light/dark theme is used without overrides. The pilot adds no
-custom theme, palette or theme picker. If a future migration is approved,
-remove those controls from migrated screens while preserving old configuration
-keys without rewriting them. That migration is a separate task.
+The target links the shared texture-settings model, flat-config serialization,
+SD preference store and focus utilities, plus Borealis/platform dependencies.
+It does not link or call SaveMount, SaveEditor, SaveWorkflow or HTTP. It never
+mounts game saves. It reads/writes `/switch/TomoToolNX/config.ini` only through
+the preference store, which preserves unrelated fields and legacy theme/color
+keys. Borealis continues to use its system theme. No theme picker is migrated.
 
-## Sample and controls
+See [migration boundaries and recovery](BOREALIS_MIGRATION.md) for persistence
+semantics and how SDL drawing, previews and canvases will be ported.
 
-The top-level destinations retain the application's names: WebUI, Textures,
-Mii, Player and Map, presented with the standard Borealis Switch sidebar.
-The Textures page contains fictional slots and a focusable Texture Settings
-entry. Settings opens a separate activity with standard boolean and selector
-cells and a Back row. Values live only in RAM, including when the child is
-reopened, and reset on exit. Other sample rows open an informational dialog.
+## Controls
 
-- ZL/ZR: previous/next top-level tab, wrapping at the ends and restoring the
-  last content focus. They are unavailable in the child screen and dialogs.
-- D-pad or left stick: standard Borealis focus navigation. The sidebar also
-  supports choosing a destination and A enters that destination's content.
-- A: activate a row, enter settings, toggle the demo switch, or open a selector.
-- B: close the innermost dialog/selector, return from settings to its entry row,
-  or return from tab content to the sidebar. B at the sidebar does nothing.
-- Touch: tap sidebar destinations, rows, selector choices, the Back row/footer
-  hint or Return to tab list. Each essential action has both routes.
-- Exit pilot: focusable/tappable row in WebUI. Plus, Minus, X and Y have no
-  pilot actions. There is no Save action because the pilot has no user data.
+ZL/ZR switch top-level tabs. D-pad/left stick move focus; A enters or activates;
+B closes the innermost interaction or returns to the parent. Settings has five
+standard selector rows, Save preferences, Reload preferences and Back. Changes
+remain drafts until saved. Back with changes offers Save and return, Discard
+changes or Keep editing. Disabled rows are skipped and retain their values.
+Touch provides the same controls. Plus/Minus/X/Y remain unbound in this target.
 
-`Navigation` in `prototype/borealis/source/pilot.cpp` owns tab selection and
-shared bindings. Cached pages keep focus, scroll and local state. Borealis's
-activity stack handles child/modal isolation and return focus. This deliberately
-does not use `TabFrame`, which destroys/recreates its page when changing tabs.
-There are no new subtabs, renderer customizations, or global theme/style edits.
-
-All pilot strings use Borealis i18n resources. English, Spanish and Latin
-American Spanish are included; other system locales fall back to English.
-Production language files and configuration are not read or rewritten.
+The activity stack restores entry focus and isolates settings/dialogs from tab
+switching. Root tabs retain their cached focus and scroll. Exit pilot remains a
+focusable/tappable WebUI row. English, Spanish and Latin American Spanish are
+included; other system locales fall back to English.
 
 ## Validation boundaries
 
@@ -158,7 +143,8 @@ Builds now use `TomoToolNXPlus` as the main artifact and display name, and
 `TomoToolNXPlusBorealis` as the prototype artifact name. Both NROs identify
 `EddieBeru` as the fork author in their embedded NACP metadata. The prototype's
 launcher title is `TomoToolNXPlus Borealis Pilot`; its English/Spanish screen
-titles include Plus as well. Versions remain 1.3.10 and 0.1.0 respectively.
+titles include Plus as well. At that branding update the versions were 1.3.10 and 0.1.0 respectively;
+the functional settings milestone raises the prototype to 0.2.0.
 Upstream and dependency credits are retained.
 
 The numeric application Title ID remains unspecified, preserving the emulator
@@ -176,3 +162,10 @@ English/Spanish pilot title resources include Plus and retain matching key sets.
 The main build still reports existing warnings in unrelated code. These checks
 were performed on the host; the renamed builds have not been rerun on hardware
 or in the emulator.
+
+## Functional settings milestone (2026-11-09)
+
+The user reports that both Plus builds preceding v0.2.0 run well on a physical
+Switch. This records user-reported hardware startup/runtime evidence for those
+builds, without attributing specific controller, touch or theme checks to it.
+The new v0.2.0 preference workflow requires its own hardware validation.

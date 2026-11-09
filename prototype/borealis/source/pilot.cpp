@@ -1,4 +1,6 @@
 #include "pilot.hpp"
+#include "texture_settings_screen.hpp"
+#include "texture_settings_store.h"
 
 #include <array>
 #include <functional>
@@ -8,12 +10,6 @@ namespace pilot
 namespace
 {
 using namespace brls::literals;
-
-struct SampleSettings
-{
-    bool preview = true;
-    int fit = 0;
-};
 
 brls::Box* makeList(const std::string& title, const std::string& description)
 {
@@ -57,31 +53,6 @@ brls::DetailCell* addAction(brls::Box* list, const std::string& text,
     return cell;
 }
 
-brls::View* makeSettings(SampleSettings& settings)
-{
-    auto* list = makeList("pilot/settings"_i18n, "pilot/settings_note"_i18n);
-    auto* preview = new brls::BooleanCell();
-    preview->init("pilot/preview"_i18n, settings.preview,
-        [&settings](bool value) { settings.preview = value; });
-    list->addView(preview);
-
-    auto* fit = new brls::SelectorCell();
-    fit->init("pilot/fit"_i18n,
-        {"pilot/cover"_i18n, "pilot/contain"_i18n, "pilot/fill"_i18n}, settings.fit,
-        [&settings](int value) { settings.fit = value; });
-    list->addView(fit);
-    addAction(list, "hints/back"_i18n, "pilot/textures"_i18n,
-        [](brls::View*) { brls::Application::popActivity(); });
-
-    auto* frame = new brls::AppletFrame(scroll(list));
-    frame->setTitle("pilot/settings"_i18n);
-    frame->registerAction("hints/back"_i18n, brls::BUTTON_B, [](brls::View*) {
-        brls::Application::popActivity();
-        return true;
-    }, false, false, brls::SOUND_BACK);
-    return frame;
-}
-
 class Navigation : public brls::Box
 {
 public:
@@ -108,7 +79,7 @@ public:
             {
                 addAction(list, "pilot/settings"_i18n, "hints/open"_i18n,
                     [this](brls::View*) {
-                        brls::Application::pushActivity(new brls::Activity(makeSettings(settings)));
+                        brls::Application::pushActivity(new brls::Activity(createTextureSettingsScreen(TextureSettings::ConfigPath)));
                     });
                 addSample(list, "pilot/shirt"_i18n, "pilot/ready"_i18n);
                 addSample(list, "pilot/room"_i18n, "pilot/ready"_i18n);
@@ -186,7 +157,6 @@ private:
         brls::Application::giveFocus(sidebar->getItem(active));
     }
 
-    SampleSettings settings;
     brls::Sidebar* sidebar;
     brls::Box* content;
     std::array<brls::ScrollingFrame*, 5> pages{};

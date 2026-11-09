@@ -12,15 +12,20 @@ set(USE_GLES3 OFF CACHE BOOL "" FORCE)
 include("${BOREALIS_LIBRARY}/cmake/commonOption.cmake")
 include("${BOREALIS_LIBRARY}/cmake/toolchain.cmake")
 
-project(TomoToolNXPlusBorealis VERSION 0.1.0 LANGUAGES C CXX)
+project(TomoToolNXPlusBorealis VERSION 0.2.0 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_subdirectory("${BOREALIS_LIBRARY}" borealis EXCLUDE_FROM_ALL)
 # Borealis uses dynamic_cast and exceptions; the production Makefile stays unchanged.
 target_compile_options(borealis PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-frtti;-fexceptions>)
 
-add_executable(TomoToolNXPlusBorealis source/main.cpp source/pilot.cpp
+add_executable(TomoToolNXPlusBorealis source/main.cpp source/pilot.cpp source/texture_settings_screen.cpp
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../source/texture_settings.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../source/texture_settings_config.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../source/texture_settings_store.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../source/focus_navigation.cpp"
     "${BOREALIS_LIBRARY}/lib/platforms/switch/switch_wrapper.c")
+target_include_directories(TomoToolNXPlusBorealis PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../include")
 target_link_libraries(TomoToolNXPlusBorealis PRIVATE borealis)
 target_link_options(TomoToolNXPlusBorealis PRIVATE
     "-Wl,--gc-sections,-Map,${CMAKE_CURRENT_BINARY_DIR}/TomoToolNXPlusBorealis.map")

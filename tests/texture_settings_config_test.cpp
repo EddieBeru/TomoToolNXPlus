@@ -91,6 +91,24 @@ int main() {
     CHECK(!SelectValue(changed, Row::Bc1Mode, 0));
     CHECK(PatchConfig(original, state, changed, patched));
     auto expected = original; expected.replace(expected.find("encoder=custom"), 14, "encoder=pca"); CHECK(patched == expected);
+    const char* configKeys[] = {"canvas_shape", "encoder", "bc1_mode", "fit_mode", "matte"};
+    for (int i = 0; i < RowCount; ++i) {
+        State prefs; CHECK(DecodeConfig(original, prefs));
+        State edited = prefs;
+        const auto row = static_cast<Row>(i);
+        const int value = (ValueIndex(prefs, row) + 1) % ValueCount(row);
+        CHECK(SelectValue(edited, row, value));
+        CHECK(PatchConfig(original, prefs, edited, patched));
+        State decoded; CHECK(DecodeConfig(patched, decoded));
+        CHECK(ValueIndex(decoded, row) == value);
+        // A focused edit only replaces the selected key's value bytes.
+        const auto begin = original.find(std::string(configKeys[i]) + "=");
+        const auto equal = original.find('=', begin);
+        const auto end = original.find("\r\n", equal);
+        const auto editedEnd = patched.find("\r\n", equal);
+        CHECK(patched.substr(0, equal + 1) == original.substr(0, equal + 1));
+        CHECK(patched.substr(editedEnd) == original.substr(end));
+    }
     for (auto bad : {"encoder=unknown", "matte=xx2233", "fit_mode=invalid", "canvas_shape=", "bc1_mode=5color"}) {
         State before = state; CHECK(!DecodeConfig(bad, state)); CHECK(state.matte.r == before.matte.r);
     }
