@@ -1,135 +1,135 @@
-<div align="center">
-
-<img src="icon.jpg" width="110" alt="">
-
 # TomoToolNXPlus
 
-**A full Tomodachi Life save editor that runs on the Switch itself.**
+**A spec-driven rebuild of the TomoToolNX experience, maintained by EddieBeru.**
 
-No PC, no save manager, no sending your save anywhere. Edit it from the couch
-with a controller, or from your phone's browser over WiFi.
+TomoToolNXPlus is a fork of [TomoToolNX](https://github.com/miiazertyy/TomoToolNX),
+a Nintendo Switch editor for Tomodachi Life saves. The goal is to turn a useful
+but difficult-to-maintain program into a coherent, predictable tool, with save
+integrity taking priority over everything else.
 
-[![Release](https://img.shields.io/github/v/release/miiazertyy/TomoToolNX?color=e8b923&label=download)](https://github.com/miiazertyy/TomoToolNX/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/miiazertyy/TomoToolNX/total?color=e8b923)](https://github.com/miiazertyy/TomoToolNX/releases)
-[![License](https://img.shields.io/badge/license-GPL--3.0-e8b923)](LICENSE)
-![Platform](https://img.shields.io/badge/platform-Nintendo%20Switch-e8b923)
-![Built with](https://img.shields.io/badge/C%2B%2B-devkitA64%20%C2%B7%20libnx-e8b923)
+## Why this fork exists
 
-<img src="https://i.imgur.com/qgJD6YF.png" width="860" alt="The textures tab: import a PNG over any UGC texture, with background removal running on the console">
+My assessment of the original program is blunt: useful functionality was buried
+under bad UI and UX, inconsistent controls, and tightly coupled code. It felt
+like **AI slop**: features accumulated faster than the interaction design and
+architecture could support them. That describes the result I want to fix; it
+isn't a claim that I know how every upstream contribution was produced.
 
-</div>
+I'm using AI to help rebuild it, too. The difference I want to establish is a
+process that makes the work accountable: **spec-driven development**. Requirements,
+interaction rules, failure behavior and acceptance checks come before an
+implementation is considered finished.
 
----
+**AI beats bad-AI development when the specs lead and the results are checked.**
+That is the direction of this fork, not a claim that the cleanup is already done.
 
-> [!NOTE]
-> Needs a Switch that can run homebrew. Your save is copied to the SD card before anything is written, and every texture import keeps its own backup, so you can always get back to where you started.
+## What spec-driven means here
 
-> [!TIP]
-> Stuck, or want something added? [Open an issue](https://github.com/miiazertyy/TomoToolNX/issues/new). There are no dumb questions.
+- **Define behavior first.** Describe the screen, its inputs, state transitions,
+  validation and failure paths before implementing it.
+- **Use one interaction model.** ZL/ZR switch top-level tabs; D-pad or left stick
+  move focus; A enters or activates; B cancels or returns to the parent. Essential
+  actions also need touch equivalents.
+- **Separate responsibilities.** Screens present state and call application
+  operations. They should not manipulate binary save fields or own backup rules.
+- **Protect data.** Require successful recoverable backups before save mutation,
+  preserve unrelated fields, and propagate read/write/commit failures.
+- **Ship reviewable slices.** Extract cohesive responsibilities from main.cpp,
+  reuse shared rules, and keep structural changes separate from redesigns.
+- **Verify claims.** Use synthetic regression fixtures and report host, emulator
+  and physical Switch results separately. A successful build is not proof of
+  save compatibility.
 
----
+The concrete development contract lives in [AGENTS.md](AGENTS.md), with the
+interaction and visual requirements in [UI_GUIDELINES.md](docs/UI_GUIDELINES.md).
+AI-generated work must meet those requirements; generating code is only one
+part of the job.
 
-## What it does
+## Current state
 
-| | |
-|---|---|
-| **Miis** | Stats, words, habits, belongings, relationships, housing and the whole social graph. Import and export individual Miis as `.ltd` files |
-| **Textures** | Drop a PNG over any UGC texture (FacePaint, Food, Goods, Thumbs). Resized, alpha cleaned and re-encoded for you |
-| **Background removal** | Cuts the subject out of your PNG **on the console**, with a neural net running on the Switch itself. No website, no upload |
-| **Island generator** | Build a whole island from a template, or let it surprise you. Classic, archipelago, snowy and cherry blossom |
-| **Map** | Your island as a 120x80 grid. Click any object to move it, rotate it, relink it or change who lives in it. Place and remove objects |
-| **TomodachiShare** | Browse the online catalogue, search, preview, and download shared Miis straight into a save slot |
-| **Player save** | Name, island, money, currency, birthday, region, languages, wishes, fountain, island size and the rest |
-| **Backups** | Automatic before every edit, restorable from inside the app |
-| **MTP over USB** | The SD card mounts as a USB drive while the WebUI is running, via [libhaze](https://github.com/ITotalJustice/libhaze) |
-| **Seven languages** | English, French, Spanish, German, Japanese, Russian and Chinese, in both interfaces |
+There are two independent build targets during the migration:
 
----
+| Build | Purpose |
+| --- | --- |
+| `TomoToolNXPlus.nro` | Existing SDL editor, including its broader editing features and WebUI |
+| `TomoToolNXPlusBorealis.nro` | Incremental Switch UI migration using Borealis's standard components and system themes |
 
-## Two ways to use it
+The Borealis target is **not yet a replacement for the full editor**. Its browser
+tabs still contain sample data. Its first functional screen is Texture Settings:
+canvas shape, encoder, BC1 mode, image fit and background. It reuses the existing
+settings model, keeps edits as drafts, and offers explicit saving and discard
+choices.
 
-<table>
-<tr>
-<td width="50%"><img src="https://i.imgur.com/xriEpkt.png" alt="The WebUI tab showing the server address, WiFi and MTP status, and a QR code"></td>
-<td width="50%"><img src="https://i.imgur.com/MaJJacf.png" alt="The Mii tab: the Mii list, their stats, and the Stats / Items / Habits / Words / Relations / Housing / Social subtabs"></td>
-</tr>
-<tr>
-<td valign="top">
+Those preferences use the existing `/switch/TomoToolNX/config.ini`. The migrated
+writer preserves unrelated settings and legacy theme/color keys, verifies a
+backup before overwriting an existing config, and checks the final write. The
+Borealis target does not mount or edit game saves. WebUI remains outside this
+Switch UI migration.
 
-**WebUI**
+Earlier Plus builds have user-reported success on real Switch hardware. The new
+Borealis v0.2.0 preference workflow has host regression and adapted-emulator
+checks; its physical SD/configuration behavior still needs hardware validation.
+Existing legacy code has not all been brought up to the fork's development rules.
 
-Starts a small server on the console. Point any browser on the same
-network at it, or just scan the QR code the app puts on screen.
+See [the prototype record](docs/BOREALIS_PROTOTYPE.md),
+[migration boundaries and recovery](docs/BOREALIS_MIGRATION.md), and
+[host regression checks](tests/README.md) for scope and evidence.
 
-Nicer for long sessions, a real keyboard, and dragging things around
-the map. The SD card mounts over USB at the same time.
+## Where it is going
 
-</td>
-<td valign="top">
+1. Complete functional screens in small, independently reviewable steps.
+2. Move the texture browser to real read-only data.
+3. Connect texture operations through shared validation, backup and save workflows.
+4. Migrate the remaining Switch screens while reducing main.cpp's responsibilities.
 
-**On-Switch**
+Standard controls become Borealis components. Image previews reuse decoded
+pixels with resources owned by the new renderer. Maps and custom canvases need
+dedicated NanoVG views, with their data and interaction rules extracted from SDL
+rendering. The migration adopts Borealis's visual language rather than copying
+the old interface pixel for pixel.
 
-The whole editor with a controller or the touchscreen. Nothing else
-needed, nothing else on the network.
+## Build and run
 
-**L / R** or **ZL / ZR** switch tabs, each tab lists its own buttons
-along the bottom, and **B** backs out of anything.
+Use the established devkitPro/devkitA64 + libnx toolchain and the project's Switch
+portlibs (SDL2, SDL2_image, SDL2_ttf, SDL2_mixer, zstd, curl and their dependencies).
+The optional Borealis build also requires CMake; its pinned framework source is
+included in this repository.
 
-</td>
-</tr>
-</table>
+```sh
+make setup                 # first checkout: fetch libhaze and apply local overrides
+make -j4                   # TomoToolNXPlus.nro
+make -j4 borealis-prototype # TomoToolNXPlusBorealis.nro
+```
 
----
+Copy the desired NRO into a directory under `/switch/` on the SD card and launch
+it through the homebrew menu on a homebrew-capable Switch. Both targets identify
+EddieBeru as the fork author. Existing SD paths retain the TomoToolNX name for
+configuration and backup continuity.
 
-## Install
+This fork's builds and status are separate from upstream releases. The legacy
+editor's update checker currently points to upstream; it does not track this
+fork's releases.
 
-1. Download `TomoToolNX.nro` from the [latest release](https://github.com/miiazertyy/TomoToolNX/releases/latest)
-2. Put it in `/switch/TomoToolNX/` on your SD card
-3. Launch it from the homebrew menu
+## Contributing
 
-It tells you when a newer version is out.
+For a behavior change, explain the problem, intended interaction, acceptance
+checks and data risks. Keep changes scoped and include what was actually tested.
+Report issues and propose changes in
+[this fork](https://github.com/EddieBeru/TomoToolNXPlus).
 
-**Then:** pick a user account, decide what to do with any existing backup, and
-choose WebUI or On-Switch.
+Legacy Switch translations live in `romfs/lang/`; WebUI translations live in
+`data/webui.html`. Borealis translations live in
+`prototype/borealis/resources/i18n/`. Keep user-facing text localizable and check
+longer translations as part of UI work.
 
----
+## Credits and license
 
-## Working with textures
+TomoToolNXPlus is EddieBeru's fork of TomoToolNX. The original NRO author is
+Imprimante. Critiquing and redesigning the program does not erase the upstream
+work or the contributions that made its editing features possible.
 
-PNGs are resized to the target format automatically, and the encoder is sRGB
-aware so colours come out matching the game rather than washed out.
-
-A transparent background with clean edges gives the best result, which is what
-**remove BG** is for: it runs [U^2-Net](https://github.com/xuebinqin/U-2-Net)
-directly on the console to cut out the subject, so you can take a photo and
-import it without touching a PC.
-
-<details>
-<summary><b>Encoder settings</b></summary>
-
-<br>
-
-The default Custom encoder is a faithful port of
-[ltd-save-editor](https://github.com/alexislours/ltd-save-editor)'s BC1/BC3
-encoder, which is the one that matches the game most closely. A faster PCA only
-fallback is available in the settings if you are importing a lot at once.
-
-</details>
-
----
-
-## Credits
-
-TomoToolNXPlus is EddieBeru's fork of TomoToolNX (original NRO author:
-Imprimante). The release badges, installation download link and screenshots
-above refer to the upstream project. Local fork builds use EddieBeru as the
-NRO author.
-
-This stands on other people's work, and the save format in particular took a lot
-of people a long time to understand.
-
-| | |
-|---|---|
+| Project / asset | Attribution |
+| --- | --- |
 | [LivinTheDreamToolkit](https://gamebanana.com/tools/22435) | by the UGC editor contributors, the tool this follows from |
 | [ShareMii](https://github.com/Star-F0rce/ShareMii) | by Star-F0rce, what Mii sharing is based on |
 | [alexislours/ltd-save-editor](https://github.com/alexislours/ltd-save-editor) | the save parser, the generated data tables (wishes, habits, clothes, coordinates, treasures), the `Map.sav` schema hashes, the UGC kind table, the housing edit safety rules and the BC1/BC3 encoder. AGPL-3.0-or-later |
@@ -137,121 +137,7 @@ of people a long time to understand.
 | [ITotalJustice/libhaze](https://github.com/ITotalJustice/libhaze) | MTP over USB |
 | [Switch Button Icons and Controls](https://zacksly.itch.io/switch-button-icons-and-controls) | Button prompt icons in `romfs/ui/controller/`, by Zacksly, CC BY 3.0. The bundled PNGs are unmodified. |
 
----
+| [Borealis](https://github.com/xfangfang/borealis) | Switch UI framework and bundled dependencies; pinned source, Apache 2.0 license and notices in `libs/borealis/` |
 
-## Translating it
-
-Both interfaces are translatable and you do not need to know C++ for either.
-Untranslated keys fall back to English, so a partial translation is genuinely
-useful. Open a [pull request](https://github.com/miiazertyy/TomoToolNX/compare)
-with whatever you touched.
-
-<details>
-<summary><b>The WebUI</b></summary>
-
-<br>
-
-Every string lives in one JavaScript block at the top of
-[`data/webui.html`](data/webui.html). Search for `── Translations ──`.
-
-1. Add your locale to `LOCALE_META`:
-
-   ```js
-   const LOCALE_META = [
-     {code:'en', label:'English'},
-     {code:'fr', label:'Français'},
-     {code:'es', label:'Español'},    // your new language
-   ];
-   ```
-
-2. Copy the whole `en: { ... }` block in `LOCALES`, rename the key, and
-   translate the values:
-
-   ```js
-   es: {
-     'tab.textures':'texturas',
-     'tab.mii':'mii',
-     'tab.player':'jugador',
-     // as many keys as you want, missing ones fall back to English
-   },
-   ```
-
-It then appears under **Settings, Language**, remembered per device in
-`localStorage`.
-
-</details>
-
-<details>
-<summary><b>The on-Switch UI</b></summary>
-
-<br>
-
-Plain `key=value` files in [`romfs/lang/`](romfs/lang/).
-
-1. Copy [`romfs/lang/en.txt`](romfs/lang/en.txt) to `romfs/lang/<code>.txt`
-2. Translate the right side of each `=`. Leave the keys and the `#` comments alone
-3. Add one line to `kAvailable` in [`source/i18n.cpp`](source/i18n.cpp):
-
-   ```cpp
-   const std::vector<Lang::Entry> kAvailable = {
-       {"en", "English"},
-       {"fr", "Français"},
-       {"es", "Español"},               // your new language
-   };
-   ```
-
-4. Rebuild the `.nro`
-
-It then appears under **Settings, Language**, remembered in `config.ini`.
-
-</details>
-
----
-
-## Building it
-
-<details>
-<summary><b>From source</b></summary>
-
-<br>
-
-You need [MSYS2](https://www.msys2.org/) on Windows, and
-[devkitPro](https://devkitpro.org/wiki/Getting_Started) with `devkitA64` and
-`libnx`.
-
-Inside the MSYS2 devkitPro shell:
-
-```sh
-dkp-pacman -S switch-sdl2 switch-sdl2_image switch-sdl2_ttf switch-sdl2_mixer \
-             switch-mpg123 switch-freetype switch-harfbuzz switch-zstd \
-             switch-curl switch-mbedtls
-```
-
-`dkp-pacman` pulls the transitive dependencies (`libogg`, `libvorbisidec`,
-`libopus`, `opusfile`, `libmodplug`, `flac`) in on its own. `switch-sdl2_mixer`
-and `switch-mpg123` are there for the click and navigation sounds in the
-on-Switch UI.
-
-Then:
-
-```sh
-make setup   # once after cloning, fetches libhaze into libs/libhaze/
-make
-```
-
-Out comes `TomoToolNXPlus.nro`. Every build after the first is just `make`.
-
-An optional, isolated Switch UI pilot is available with `make borealis-prototype`.
-It produces `TomoToolNXPlusBorealis.nro` with sample browser tabs, real texture preferences, and no game-save access.
-See [the Borealis pilot notes](docs/BOREALIS_PROTOTYPE.md) for controls,
-dependencies and validation limits.
-
-</details>
-
----
-
-<div align="center">
-
-GPL-3.0. Have fun with your island.
-
-</div>
+The project's [GPL-3.0 license](LICENSE) and third-party attribution obligations
+remain in place. See the bundled dependency licenses and `romfs/ASSET_CREDITS.txt`.
