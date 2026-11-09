@@ -593,3 +593,10 @@ save.error.edit = Volver al editor
 save.error.footer = A  reintentar    B  volver al editor
 save.error.user = No se puede guardar: no hay un usuario válido seleccionado.
 save.error.backup = Falló la copia de seguridad. No se inició el guardado.
+
+settings.nav.apply = Aplicar
+settings.nav.back = Volver a texturas
+settings.nav.pending = Elige una opción y aplica o cancela el cambio.
+settings.nav.browse = Elige un ajuste para editar.
+settings.nav.options = Izq/Der  elegir    A  aplicar    B  cancelar
+settings.nav.rows = Arriba/Abajo  enfocar    A  abrir opciones    B  volver

@@ -7,7 +7,6 @@ using namespace TextureProcessor;
 
 struct RowDefinition {
     int valueCount;
-    bool cyclesOnActivate;
     bool (*enabled)(const State&);
     int (*valueIndex)(const State&);
     void (*setValue)(State&, int);
@@ -15,26 +14,26 @@ struct RowDefinition {
 
 bool AlwaysEnabled(const State&) { return true; }
 
-// Indexed by Row; A cycles only Shape and Encoder (legacy behavior).
+// Indexed by Row.
 const RowDefinition kRows[] = {
-    {3, true, AlwaysEnabled,
+    {3, AlwaysEnabled,
      [](const State& s) { return static_cast<int>(s.canvasShape); },
      [](State& s, int v) { s.canvasShape = static_cast<CanvasShape>(v); }},
-    {2, true, AlwaysEnabled,
+    {2, AlwaysEnabled,
      [](const State& s) { return static_cast<int>(s.encoder); },
      [](State& s, int v) { s.encoder = static_cast<Bc1Encoder>(v); }},
-    {3, false, [](const State& s) { return s.encoder == Bc1Encoder::Custom; },
+    {3, [](const State& s) { return s.encoder == Bc1Encoder::Custom; },
      [](const State& s) { return static_cast<int>(s.bc1Mode); },
      [](State& s, int v) { s.bc1Mode = static_cast<Bc1Mode>(v); }},
-    {3, false, AlwaysEnabled,
+    {3, AlwaysEnabled,
      [](const State& s) { return static_cast<int>(s.fitMode); },
      [](State& s, int v) { s.fitMode = static_cast<FitMode>(v); }},
-    {3, false, [](const State& s) { return s.fitMode == FitMode::Contain; },
+    {3, [](const State& s) { return s.fitMode == FitMode::Contain; },
      [](const State& s) {
          if (s.matte.a == 0) return 0;
          if (s.matte.r == 255 && s.matte.g == 255 && s.matte.b == 255) return 1;
          if (s.matte.r == 0 && s.matte.g == 0 && s.matte.b == 0) return 2;
-         return 0;
+         return -1;
      },
      [](State& s, int v) {
          if (v == 0) s.matte = {};
@@ -56,15 +55,6 @@ bool SamePreferences(const State& a, const State& b) {
            a.matte.b == b.matte.b && a.matte.a == b.matte.a;
 }
 
-void MoveFocus(State& state, int direction) {
-    for (int i = static_cast<int>(state.focus) + direction;
-         i >= 0 && i < RowCount; i += direction) {
-        if (IsEnabled(state, static_cast<Row>(i))) {
-            state.focus = static_cast<Row>(i);
-            return;
-        }
-    }
-}
 
 } // namespace
 
@@ -80,41 +70,88 @@ int ValueIndex(const State& state, Row row) {
     return IsValid(row) ? kRows[static_cast<int>(row)].valueIndex(state) : -1;
 }
 
+Row FocusedRow(const State& state) {
+    return static_cast<Row>(state.navigation.Root());
+}
+
+bool IsEditing(const State& state) {
+    return state.navigation.Depth() > 1;
+}
+
+int FocusedOption(const State& state) {
+    return IsEditing(state) ? state.navigation.Current() : -1;
+}
+
+void Open(State& state) {
+    state.navigation.Reset(state.navigation.Root());
+    NormalizeFocus(state);
+}
+
 void NormalizeFocus(State& state) {
-    if (IsEnabled(state, state.focus)) return;
-    if (!IsValid(state.focus)) state.focus = Row::Shape;
-    if (IsEnabled(state, state.focus)) return;
-    MoveFocus(state, 1);
-    if (!IsEnabled(state, state.focus)) MoveFocus(state, -1);
+    const Row row = FocusedRow(state);
+    if (!IsEnabled(state, row)) {
+        const int current = static_cast<int>(row);
+        const auto enabled = [&](int index) { return IsEnabled(state, static_cast<Row>(index)); };
+        int next = FocusNavigation::NextIndex(current, 1, RowCount, false, enabled);
+        if (next < 0) next = FocusNavigation::NextIndex(current, -1, RowCount, false, enabled);
+        state.navigation.Reset(next);
+    } else if (IsEditing(state) &&
+               (FocusedOption(state) < 0 || FocusedOption(state) >= ValueCount(row))) {
+        state.navigation.Focus(std::max(0, ValueIndex(state, row)));
+    }
 }
 
 void FocusRow(State& state, Row row) {
-    if (IsEnabled(state, row)) state.focus = row;
+    if (!IsEditing(state) && IsEnabled(state, row)) state.navigation.Focus(static_cast<int>(row));
 }
 
-bool SelectValue(State& state, Row row, int value) {
+bool EnterRow(State& state, Row row) {
+    if (IsEditing(state) || !IsEnabled(state, row) || !state.input.Consume()) return false;
+    state.navigation.Focus(static_cast<int>(row));
+    state.navigation.Enter(std::max(0, ValueIndex(state, row)));
+    return true;
+}
+
+bool PreviewValue(State& state, Row row, int value) {
     if (!IsEnabled(state, row) || value < 0 || value >= ValueCount(row)) return false;
-    const State before = state;
-    state.focus = row;
-    kRows[static_cast<int>(row)].setValue(state, value);
-    NormalizeFocus(state);
-    return !SamePreferences(before, state);
+    if (IsEditing(state) && FocusedRow(state) != row) return false;
+    if (!state.input.Consume()) return false;
+    if (!IsEditing(state)) {
+        state.navigation.Focus(static_cast<int>(row));
+        state.navigation.Enter(value);
+    } else state.navigation.Focus(value);
+    return true;
 }
 
-bool Apply(State& state, Action action) {
-    if (action == Action::None) return false;
+Outcome Apply(State& state, FocusNavigation::Command command) {
+    using FocusNavigation::Command;
+    Outcome result;
+    if (command == Command::None || state.input.Consumed()) return result;
     NormalizeFocus(state);
-    if (action == Action::FocusPrevious || action == Action::FocusNext) {
-        MoveFocus(state, action == Action::FocusPrevious ? -1 : 1);
-        return false;
+    const Row row = FocusedRow(state);
+    if (command == Command::Back) {
+        state.input.Consume();
+        result.leaveParent = !state.navigation.Back();
+    } else if (command == Command::Activate) {
+        if (!IsEditing(state)) { EnterRow(state, row); return result; }
+        state.input.Consume();
+        const State before = state;
+        kRows[static_cast<int>(row)].setValue(state, FocusedOption(state));
+        state.navigation.Back();
+        NormalizeFocus(state);
+        result.preferencesChanged = !SamePreferences(before, state);
+    } else if (!IsEditing(state) && (command == Command::Up || command == Command::Down)) {
+        state.input.Consume();
+        const int next = FocusNavigation::NextIndex(static_cast<int>(row),
+            command == Command::Up ? -1 : 1, RowCount, false,
+            [&](int index) { return IsEnabled(state, static_cast<Row>(index)); });
+        state.navigation.Focus(next);
+    } else if (IsEditing(state) && (command == Command::Left || command == Command::Right)) {
+        state.input.Consume();
+        state.navigation.Focus(FocusNavigation::NextIndex(FocusedOption(state),
+            command == Command::Left ? -1 : 1, ValueCount(row), true));
     }
-    const auto& row = kRows[static_cast<int>(state.focus)];
-    if (action == Action::Activate && !row.cyclesOnActivate) return false;
-    if (action != Action::PreviousValue && action != Action::NextValue &&
-        action != Action::Activate) return false;
-    const int delta = action == Action::PreviousValue ? -1 : 1;
-    const int value = (row.valueIndex(state) + delta + row.valueCount) % row.valueCount;
-    return SelectValue(state, state.focus, value);
+    return result;
 }
 
 } // namespace TextureSettings

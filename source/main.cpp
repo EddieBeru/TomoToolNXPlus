@@ -1144,7 +1144,16 @@ static bool HitFire(int tx, int ty) {
 
 // Touch handler helpers
 static void TSimBtn (int btn)   { gSimKDown |= (u64)(uint32_t)btn; }
-static void TSetMode(int mode)  { gOnSwitchMode = (OnSwitchMode)mode; gOnSwitchMsg = ""; }
+static void TSetMode(int mode) {
+    if (gOnSwitchMode == OnSwitchMode::TexSettings || mode == (int)OnSwitchMode::TexSettings) {
+        if (gOnSwitchMode == OnSwitchMode::TexSettings && TextureSettings::IsEditing(gTextureSettings)) return;
+        if (!gTextureSettings.input.Consume()) return;
+        if (mode == (int)OnSwitchMode::TexSettings) TextureSettings::Open(gTextureSettings);
+        HitClear();
+    }
+    gOnSwitchMode = (OnSwitchMode)mode;
+    gOnSwitchMsg = "";
+}
 
 // Defined after their target globals are declared (forward refs below via lambdas are fine as fn ptrs)
 static void TSelUser (int idx);
@@ -1317,7 +1326,7 @@ static void TSettingsRowLeft (int row) { gSettingsSel = row; gSimKDown |= HidNpa
 static void TSettingsRowRight(int row) { gSettingsSel = row; gSimKDown |= HidNpadButton_Right; }
 static void TSettingsRowA    (int row) { gSettingsSel = row; gSimKDown |= HidNpadButton_A;     }
 static void TSelTexSettingsItem(int i) {
-    TextureSettings::FocusRow(gTextureSettings, static_cast<TextureSettings::Row>(i));
+    if (TextureSettings::EnterRow(gTextureSettings, static_cast<TextureSettings::Row>(i))) HitClear();
 }
 static void TRestorePickSel(int i)  { gRestoreSel  = i; }
 static void TRestoreConfirmA(int)   { gSimKDown |= HidNpadButton_A; }
@@ -4160,17 +4169,28 @@ static void TUgcActivateBtn(int) {
 }
 // Touch entry-point: focus the tapped button, then run it.
 static void TUgcBtnTap(int i) { gUgcBtnSel = i; TUgcActivateBtn(0); }
-static void ApplyTextureSettingsAction(TextureSettings::Action action) {
-    if (TextureSettings::Apply(gTextureSettings, action)) SaveConfig();
+static void ApplyTextureSettingsAction(FocusNavigation::Command command) {
+    const auto result = TextureSettings::Apply(gTextureSettings, command);
+    if (result.preferencesChanged) SaveConfig();
+    if (result.leaveParent) {
+        gOnSwitchMode = OnSwitchMode::UGC;
+        gUgcBtnSel = 5;
+        gOnSwitchMsg = "";
+    }
+    if (gTextureSettings.input.Consumed()) HitClear();
 }
 static void SelectTextureSettingsValue(TextureSettings::Row row, int value) {
-    if (TextureSettings::SelectValue(gTextureSettings, row, value)) SaveConfig();
+    if (TextureSettings::PreviewValue(gTextureSettings, row, value)) HitClear();
 }
 static void TSetEncMode(int v) { SelectTextureSettingsValue(TextureSettings::Row::Encoder, v); }
 static void TSetBc1Mode(int v) { SelectTextureSettingsValue(TextureSettings::Row::Bc1Mode, v); }
 static void TSetFitMode(int v) { SelectTextureSettingsValue(TextureSettings::Row::Fit, v); }
 static void TSetCanvasShape(int v) { SelectTextureSettingsValue(TextureSettings::Row::Shape, v); }
 static void TSetMatte(int v) { SelectTextureSettingsValue(TextureSettings::Row::Background, v); }
+static void TConfirmTextureSettings(int) {
+    if (TextureSettings::IsEditing(gTextureSettings)) ApplyTextureSettingsAction(FocusNavigation::Command::Activate);
+}
+static void TBackTextureSettings(int) { ApplyTextureSettingsAction(FocusNavigation::Command::Back); }
 
 // + Blank UGC handler. Kind is derived from the current category filter
 // (gUgcFilter / the kind picker) when set, otherwise defaults to MapObject
@@ -5630,6 +5650,8 @@ static void DrawFileBrowser() {
 // ─── Texture encoding settings tab ───────────────────────────────────────────
 static void DrawTexSettings() {
     using Row = TextureSettings::Row;
+    const bool editing = TextureSettings::IsEditing(gTextureSettings);
+    const Row focusedRow = TextureSettings::FocusedRow(gTextureSettings);
     HitClear();
     SDL_SetRenderDrawColor(gRen, COL_BG.r, COL_BG.g, COL_BG.b, 255);
     SDL_RenderClear(gRen);
@@ -5647,12 +5669,12 @@ static void DrawTexSettings() {
             {Lang::T("tab.map"),      OnSwitchMode::Map}};
         // None of the 5 base tabs are "selected" on this screen — the gear is.
         for (auto& t : tabs) {
-            HitAdd(tx,ty,tw,th,TSetMode,(int)t.mode);
+            if (!editing) HitAdd(tx,ty,tw,th,TSetMode,(int)t.mode);
             DrawTextC(t.label,tx+tw/2,ty+th/2,COL_DIM);
             tx+=tw+gap;
         }
         // Gear represents the texture-settings tab.
-        HitAdd(tx,ty,gearTw,th,TSetMode,(int)OnSwitchMode::TexSettings);
+        if (!editing) HitAdd(tx,ty,gearTw,th,TSetMode,(int)OnSwitchMode::TexSettings);
         DrawGearIcon(tx+gearTw/2,ty+th/2,th*38/100,COL_GOLD);
         // Underline slides from wherever it last sat (e.g. "Textures") to
         // beneath the gear, since the owner tag matches the other tab bars.
@@ -5661,28 +5683,32 @@ static void DrawTexSettings() {
         DrawTabUnderline(0);
     }
 
-    const int contentX = (SCREEN_W - 720) / 2;
-    const int contentY = 68;
-    const int sectionW = 720;
-    const int rowH     = 62;
+    const int contentX = (SCREEN_W - 960) / 2;
+    const int contentY = 84;
+    const int sectionW = 960;
+    const int rowH     = 86;
     const int rowGap   = 8;
 
     auto rowY = [&](Row row) { return contentY + static_cast<int>(row) * (rowH + rowGap); };
     auto drawPillRow = [&](Row row, int sy, const std::string& label,
                            const std::string& hint) -> void {
         const bool disabled = !TextureSettings::IsEnabled(gTextureSettings, row);
-        bool selRow = (gTextureSettings.focus == row);
+        bool selRow = (focusedRow == row);
         SDL_Color bg = selRow ? COL_SEL : COL_PANEL;
         SDL_Color br = disabled ? SDL_Color{45,45,45,255}
-                                : (selRow ? COL_GOLD : COL_BORDER);
+                                : (selRow && !editing ? COL_ACCENT : COL_BORDER);
         FillRect(contentX, sy, sectionW, rowH, bg);
         DrawRect(contentX, sy, sectionW, rowH, br);
-        if (!disabled)
+        if (!disabled && !editing)
             HitAdd(contentX, sy, sectionW, rowH, TSelTexSettingsItem, static_cast<int>(row));
+        if (selRow && !editing) {
+            DrawRect(contentX + 1, sy + 1, sectionW - 2, rowH - 2, COL_ACCENT);
+            DrawText(">", contentX - 24, sy + 8, COL_ACCENT, Font::Md);
+        }
         SDL_Color lblCol = disabled ? COL_DIM : (selRow ? COL_TEXT : COL_DIM);
         SDL_Color dscCol = disabled ? SDL_Color{55,55,55,255} : COL_DIM;
         DrawText(label, contentX + 16, sy + 8,  lblCol, Font::Md);
-        DrawText(hint,  contentX + 16, sy + 36, dscCol, Font::Sm);
+        DrawText(hint,  contentX + 16, sy + 59, dscCol, Font::Sm);
     };
 
     auto drawPills = [&](Row row, int sy, int btnW, int btnH,
@@ -5690,22 +5716,32 @@ static void DrawTexSettings() {
         const int btnCount = TextureSettings::ValueCount(row);
         const int curIdx = TextureSettings::ValueIndex(gTextureSettings, row);
         const bool disabled = !TextureSettings::IsEnabled(gTextureSettings, row);
-        const int btnGap = 6;
+        const int btnGap = 14;
         int bx = contentX + sectionW - btnCount*(btnW+btnGap) - 10;
-        int by = sy + (rowH - btnH) / 2;
-        bool selRow = (gTextureSettings.focus == row);
+        int by = sy + 8;
+        bool selRow = (focusedRow == row);
         for (int k = 0; k < btnCount; k++) {
             bool on = (!disabled && curIdx == k);
             SDL_Color bg = disabled ? SDL_Color{30,30,30,255}
                                     : (on ? COL_GOLD : COL_BG);
             SDL_Color br = disabled ? SDL_Color{45,45,45,255}
-                                    : (on ? COL_GOLD : (selRow ? COL_GOLD : COL_BORDER));
+                                    : (on ? COL_GOLD : COL_BORDER);
             SDL_Color tc = disabled ? SDL_Color{55,55,55,255}
                                     : (on ? COL_BG : COL_DIM);
             FillRect(bx, by, btnW, btnH, bg);
             DrawRect(bx, by, btnW, btnH, br);
             DrawTextC(names[k], bx + btnW/2, by + btnH/2, tc, Font::Sm);
-            if (!disabled) HitAdd(bx, by, btnW, btnH, cb, k);
+            if (on) {
+                SDL_SetRenderDrawColor(gRen, tc.r, tc.g, tc.b, tc.a);
+                SDL_RenderDrawLine(gRen, bx + btnW - 14, by + 8, bx + btnW - 11, by + 11);
+                SDL_RenderDrawLine(gRen, bx + btnW - 11, by + 11, bx + btnW - 6, by + 5);
+            }
+            if (editing && selRow && TextureSettings::FocusedOption(gTextureSettings) == k) {
+                DrawRect(bx - 2, by - 2, btnW + 4, btnH + 4, COL_ACCENT);
+                DrawRect(bx - 3, by - 3, btnW + 6, btnH + 6, COL_ACCENT);
+                DrawText(">", bx - 12, by + 10, COL_ACCENT, Font::Sm);
+            }
+            if (!disabled && (!editing || selRow)) HitAdd(bx, by, btnW, btnH, cb, k);
             bx += btnW + btnGap;
         }
     };
@@ -5725,7 +5761,7 @@ static void DrawTexSettings() {
         // is what posters, signs, paintings, and any other wide-display
         // mesh wants.
         const char* names[] = { "Square", "Book", "TV wide" };
-        drawPills(Row::Shape, sy, 96, 28, names, TSetCanvasShape);
+        drawPills(Row::Shape, sy, 132, 44, names, TSetCanvasShape);
     }
 
     // ── Row 1: Encoder ──────────────────────────────────────────────────────
@@ -5736,7 +5772,7 @@ static void DrawTexSettings() {
             : Lang::T("settings.encoder.hint.pca");
         drawPillRow(Row::Encoder, sy, Lang::T("settings.encoder"), hint);
         const char* names[] = { "Gamma-aware", "PCA" };
-        drawPills(Row::Encoder, sy, 130, 28, names, TSetEncMode);
+        drawPills(Row::Encoder, sy, 140, 44, names, TSetEncMode);
     }
 
     // ── Row 2: BC1 Mode ──────────────────────────────────────────────────────
@@ -5749,7 +5785,7 @@ static void DrawTexSettings() {
                                                                    Lang::T("settings.bc1.hint.threeColor");
         drawPillRow(Row::Bc1Mode, sy, Lang::T("settings.bc1"), hint);
         const char* names[] = { "Auto", "4-color", "3-color" };
-        drawPills(Row::Bc1Mode, sy, 80, 28, names, TSetBc1Mode);
+        drawPills(Row::Bc1Mode, sy, 132, 44, names, TSetBc1Mode);
     }
 
     // ── Row 3: Fit mode ──────────────────────────────────────────────────────
@@ -5761,7 +5797,7 @@ static void DrawTexSettings() {
                                                                 Lang::T("settings.fit.hint.fill");
         drawPillRow(Row::Fit, sy, Lang::T("settings.fit"), hint);
         const char* names[] = { "Cover", "Contain", "Fill" };
-        drawPills(Row::Fit, sy, 80, 28, names, TSetFitMode);
+        drawPills(Row::Fit, sy, 132, 44, names, TSetFitMode);
     }
 
     // ── Row 4: Background (matte) — only relevant when Fit == Contain ───────
@@ -5773,10 +5809,26 @@ static void DrawTexSettings() {
             : Lang::T("settings.matte.desc");
         drawPillRow(Row::Background, sy, Lang::T("settings.matte"), hint);
         const char* names[] = { "Transparent", "White", "Black" };
-        drawPills(Row::Background, sy, 96, 28, names, TSetMatte);
+        drawPills(Row::Background, sy, 132, 44, names, TSetMatte);
     }
 
-    DrawFooter(Lang::T("settings.footer"));
+    const int buttonY = 600, buttonW = 230, buttonH = 48;
+    if (editing) {
+        const int confirmX = SCREEN_W/2 - buttonW - 12;
+        FillRect(confirmX, buttonY, buttonW, buttonH, COL_PANEL);
+        DrawRect(confirmX, buttonY, buttonW, buttonH, COL_ACCENT);
+        DrawTextC("A  " + Lang::T("settings.nav.apply"), confirmX + buttonW/2, buttonY + buttonH/2, COL_TEXT);
+        HitAdd(confirmX, buttonY, buttonW, buttonH, TConfirmTextureSettings, 0);
+    }
+    const int backX = editing ? SCREEN_W/2 + 12 : SCREEN_W/2 - buttonW/2;
+    FillRect(backX, buttonY, buttonW, buttonH, COL_PANEL);
+    DrawRect(backX, buttonY, buttonW, buttonH, COL_BORDER);
+    DrawTextC("B  " + Lang::T(editing ? "backprompt.cancel" : "settings.nav.back"),
+              backX + buttonW/2, buttonY + buttonH/2, COL_TEXT);
+    HitAdd(backX, buttonY, buttonW, buttonH, TBackTextureSettings, 0);
+    DrawTextC(Lang::T(editing ? "settings.nav.pending" : "settings.nav.browse"),
+              SCREEN_W/2, 570, COL_DIM, Font::Sm);
+    DrawFooter(Lang::T(editing ? "settings.nav.options" : "settings.nav.rows"));
     Present();
 }
 
@@ -12381,6 +12433,7 @@ int main(int,char**) {
     bool prevShowRestorePicker= gShowRestorePicker;
 
     while (appletMainLoop()) {
+        gTextureSettings.input.Reset();
         // Per-frame timing for animations.
         Uint32 nowMs = SDL_GetTicks();
         gDtSec = (nowMs - gLastTickMs) / 1000.f;
@@ -12432,6 +12485,10 @@ int main(int,char**) {
                         MapDragGesture(ev.tfinger.dx * SCREEN_W, ev.tfinger.dy * SCREEN_H,
                                        (int)(ev.tfinger.x * SCREEN_W), (int)(ev.tfinger.y * SCREEN_H));
                         s_touch.dragging = true;                          // so release isn't a tap
+                    } else if (gScreen == Screen::OnSwitch && gOnSwitchMode == OnSwitchMode::TexSettings) {
+                        const float dx = ev.tfinger.x * SCREEN_W - s_touch.startX;
+                        const float dy = ev.tfinger.y * SCREEN_H - s_touch.startY;
+                        if (dx * dx + dy * dy > 144.f) s_touch.dragging = true;
                     } else
                         ApplyTouchScroll(ev.tfinger.dx * SCREEN_W,
                                          ev.tfinger.dy * SCREEN_H);
@@ -12541,6 +12598,7 @@ int main(int,char**) {
             kHeld &= ~R_STICK_NAV;
         }
 
+        if (gTextureSettings.input.Consumed()) { kDown = 0; kHeld = 0; }
         gFrameKDown = kDown;   // expose to render code (prev/next click feedback)
         u64 kNav = NavRepeat(kDown, kHeld);
 
@@ -14468,39 +14526,27 @@ int main(int,char**) {
                 }
 
             } else if (gOnSwitchMode == OnSwitchMode::TexSettings) {
-                // Global navigation migration is pending.
                 TextureSettings::NormalizeFocus(gTextureSettings);
-                if (kDown&HidNpadButton_L) {
-                    gOnSwitchMode=OnSwitchMode::WebUI; gOnSwitchMsg=""; break;
-                }
-                if (kDown&HidNpadButton_R) {
-                    gOnSwitchMode=OnSwitchMode::UGC; gOnSwitchMsg=""; break;
-                }
-                if (kNav&(HidNpadButton_Up|HidNpadButton_StickLUp|HidNpadButton_StickRUp))
-                    ApplyTextureSettingsAction(TextureSettings::Action::FocusPrevious);
-                if (kNav&(HidNpadButton_Down|HidNpadButton_StickLDown|HidNpadButton_StickRDown))
-                    ApplyTextureSettingsAction(TextureSettings::Action::FocusNext);
-                if (kNav&(HidNpadButton_Right|HidNpadButton_StickLRight|HidNpadButton_StickRRight))
-                    ApplyTextureSettingsAction(TextureSettings::Action::NextValue);
-                else if (kNav&(HidNpadButton_Left|HidNpadButton_StickLLeft|HidNpadButton_StickRLeft))
-                    ApplyTextureSettingsAction(TextureSettings::Action::PreviousValue);
-                else if (kDown&HidNpadButton_A)
-                    ApplyTextureSettingsAction(TextureSettings::Action::Activate);
-
-                // B backs out of the settings drawer to the texture tab it was
-                // opened from (the gear that opens it lives there) — more
-                // intuitive than pressing L/R to some other tab to leave.
-                // Plus still runs the quit / back-to-user-pick flow.
-                if (kDown&HidNpadButton_B) {
-                    gOnSwitchMode = OnSwitchMode::UGC; gOnSwitchMsg = "";
-                    break;
-                }
-                if (kDown&HidNpadButton_Plus) {
-                    bool hasDirty = HasPendingSaveChanges();
-                    if (hasDirty) {
-                        gShowBackPrompt=true;
-                        gBackPromptToUserPick=false;
-                    } else { gQuitApp=true; }
+                const bool editing = TextureSettings::IsEditing(gTextureSettings);
+                const FocusNavigation::Input input{
+                    (kNav & (HidNpadButton_Up | HidNpadButton_StickLUp)) != 0,
+                    (kNav & (HidNpadButton_Down | HidNpadButton_StickLDown)) != 0,
+                    (kNav & (HidNpadButton_Left | HidNpadButton_StickLLeft)) != 0,
+                    (kNav & (HidNpadButton_Right | HidNpadButton_StickLRight)) != 0,
+                    (kDown & HidNpadButton_A) != 0,
+                    (kDown & HidNpadButton_B) != 0,
+                };
+                const auto command = FocusNavigation::Resolve(input,
+                    editing ? FocusNavigation::Axis::Horizontal : FocusNavigation::Axis::Vertical);
+                ApplyTextureSettingsAction(command);
+                if (gOnSwitchMode != OnSwitchMode::TexSettings) break;
+                if (!gTextureSettings.input.Consumed() && !editing && (kDown & HidNpadButton_L)) { TSetMode((int)OnSwitchMode::WebUI); break; }
+                if (!gTextureSettings.input.Consumed() && !editing && (kDown & HidNpadButton_R)) { TSetMode((int)OnSwitchMode::UGC); break; }
+                if (!gTextureSettings.input.Consumed() && !editing && (kDown & HidNpadButton_Plus)) {
+                    if (HasPendingSaveChanges()) {
+                        gShowBackPrompt = true;
+                        gBackPromptToUserPick = false;
+                    } else gQuitApp = true;
                 }
 
             } else if (gOnSwitchMode == OnSwitchMode::Map) {
