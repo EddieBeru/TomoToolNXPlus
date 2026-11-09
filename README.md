@@ -2,7 +2,7 @@
 
 <img src="icon.jpg" width="110" alt="">
 
-# TomoToolNX
+# TomoToolNXPlus
 
 **A full Tomodachi Life save editor that runs on the Switch itself.**
 
@@ -120,6 +120,11 @@ fallback is available in the settings if you are importing a lot at once.
 
 ## Credits
 
+TomoToolNXPlus is EddieBeru's fork of TomoToolNX (original NRO author:
+Imprimante). The release badges, installation download link and screenshots
+above refer to the upstream project. Local fork builds use EddieBeru as the
+NRO author.
+
 This stands on other people's work, and the save format in particular took a lot
 of people a long time to understand.
 
@@ -234,10 +239,10 @@ make setup   # once after cloning, fetches libhaze into libs/libhaze/
 make
 ```
 
-Out comes `TomoToolNX.nro`. Every build after the first is just `make`.
+Out comes `TomoToolNXPlus.nro`. Every build after the first is just `make`.
 
 An optional, isolated Switch UI pilot is available with `make borealis-prototype`.
-It produces `TomoToolNXBorealis.nro` with fictional data and no save access.
+It produces `TomoToolNXPlusBorealis.nro` with fictional data and no save access.
 See [the Borealis pilot notes](docs/BOREALIS_PROTOTYPE.md) for controls,
 dependencies and validation limits.
 

@@ -12,27 +12,27 @@ set(USE_GLES3 OFF CACHE BOOL "" FORCE)
 include("${BOREALIS_LIBRARY}/cmake/commonOption.cmake")
 include("${BOREALIS_LIBRARY}/cmake/toolchain.cmake")
 
-project(TomoToolNXBorealis VERSION 0.1.0 LANGUAGES C CXX)
+project(TomoToolNXPlusBorealis VERSION 0.1.0 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_subdirectory("${BOREALIS_LIBRARY}" borealis EXCLUDE_FROM_ALL)
 # Borealis uses dynamic_cast and exceptions; the production Makefile stays unchanged.
 target_compile_options(borealis PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-frtti;-fexceptions>)
 
-add_executable(TomoToolNXBorealis source/main.cpp source/pilot.cpp
+add_executable(TomoToolNXPlusBorealis source/main.cpp source/pilot.cpp
     "${BOREALIS_LIBRARY}/lib/platforms/switch/switch_wrapper.c")
-target_link_libraries(TomoToolNXBorealis PRIVATE borealis)
-target_link_options(TomoToolNXBorealis PRIVATE
-    "-Wl,--gc-sections,-Map,${CMAKE_CURRENT_BINARY_DIR}/TomoToolNXBorealis.map")
+target_link_libraries(TomoToolNXPlusBorealis PRIVATE borealis)
+target_link_options(TomoToolNXPlusBorealis PRIVATE
+    "-Wl,--gc-sections,-Map,${CMAKE_CURRENT_BINARY_DIR}/TomoToolNXPlusBorealis.map")
 
-add_custom_target(TomoToolNXBorealis.nro
+add_custom_target(TomoToolNXPlusBorealis.nro
     COMMAND "${CMAKE_COMMAND}" -E remove_directory "${CMAKE_CURRENT_BINARY_DIR}/resources"
     COMMAND "${CMAKE_COMMAND}" -E copy_directory
         "${CMAKE_CURRENT_SOURCE_DIR}/resources" "${CMAKE_CURRENT_BINARY_DIR}/resources"
-    COMMAND "${NX_NACPTOOL_EXE}" --create "TomoToolNX Borealis Pilot"
-        "TomoToolNXPlus contributors" "${PROJECT_VERSION}" TomoToolNXBorealis.nacp
-    COMMAND "${NX_ELF2NRO_EXE}" $<TARGET_FILE:TomoToolNXBorealis> TomoToolNXBorealis.nro
-        --icon=${NX_DEFAULT_ICON} --nacp=TomoToolNXBorealis.nacp
+    COMMAND "${NX_NACPTOOL_EXE}" --create "TomoToolNXPlus Borealis Pilot"
+        "EddieBeru" "${PROJECT_VERSION}" TomoToolNXPlusBorealis.nacp
+    COMMAND "${NX_ELF2NRO_EXE}" $<TARGET_FILE:TomoToolNXPlusBorealis> TomoToolNXPlusBorealis.nro
+        --icon=${NX_DEFAULT_ICON} --nacp=TomoToolNXPlusBorealis.nacp
         --romfsdir=${CMAKE_CURRENT_BINARY_DIR}/resources
-    DEPENDS TomoToolNXBorealis
+    DEPENDS TomoToolNXPlusBorealis
     VERBATIM)

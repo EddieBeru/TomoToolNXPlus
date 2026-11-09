@@ -10,8 +10,8 @@ Use the existing devkitPro/libnx installation, Switch SDL2/Mesa portlibs, CMake
 (3.13 or newer) and GNU Make:
 
 ```sh
-make                      # existing TomoToolNX.nro
-make -j4 borealis-prototype # separate TomoToolNXBorealis.nro
+make                      # existing TomoToolNXPlus.nro
+make -j4 borealis-prototype # separate TomoToolNXPlusBorealis.nro
 make borealis-prototype-clean
 ```
 
@@ -151,3 +151,28 @@ hardware before adopting the framework.
 Native 1280 × 720 captures from the adapted emulator copy:
 [Textures](images/borealis-prototype/textures-es.png) and
 [Texture Settings](images/borealis-prototype/settings-es.png).
+
+## Fork branding
+
+Builds now use `TomoToolNXPlus` as the main artifact and display name, and
+`TomoToolNXPlusBorealis` as the prototype artifact name. Both NROs identify
+`EddieBeru` as the fork author in their embedded NACP metadata. The prototype's
+launcher title is `TomoToolNXPlus Borealis Pilot`; its English/Spanish screen
+titles include Plus as well. Versions remain 1.3.10 and 0.1.0 respectively.
+Upstream and dependency credits are retained.
+
+The numeric application Title ID remains unspecified, preserving the emulator
+compatibility decision in the main Makefile. The game Title ID, existing SD
+paths, configuration, backups and `.ltd`/`.ltdx` file formats are unaffected by
+this packaging change. The NRO name/author fields carry the fork identity.
+
+The verification record and captures above predate the Plus branding update.
+
+Branding verification: `make -j4` and `make -j4 borealis-prototype` succeeded.
+The embedded NACP was read back from each final NRO: all 12 language entries
+populated by nacptool contain the expected Plus name and author EddieBeru;
+versions match their build definitions and the presence group ID is zero.
+English/Spanish pilot title resources include Plus and retain matching key sets.
+The main build still reports existing warnings in unrelated code. These checks
+were performed on the host; the renamed builds have not been rerun on hardware
+or in the emulator.

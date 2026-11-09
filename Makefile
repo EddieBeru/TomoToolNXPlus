@@ -43,9 +43,9 @@ include $(DEVKITPRO)/libnx/switch_rules
 # EXEFS_SRC is the optional input directory containing data copied into exefs
 # ROMFS is the optional read only filesystem for this app
 #---------------------------------------------------------------------------------
-TARGET      := TomoToolNX
-APP_TITLE   := TomoToolNX
-APP_AUTHOR  := Imprimante
+TARGET      := TomoToolNXPlus
+APP_TITLE   := TomoToolNXPlus
+APP_AUTHOR  := EddieBeru
 # Read from source/updater.h rather than duplicated here — the two drifted
 # apart before (the NACP still said 1.3.8 while the app printed 1.3.10, so
 # Sphaira showed the stale number).
@@ -225,11 +225,11 @@ all: $(BUILD)
 # Optional, isolated UI experiment. Keep the default target and app flags intact.
 borealis-prototype:
 	@cmake -S prototype/borealis -B build/borealis-prototype -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release
-	+@$(MAKE) --no-print-directory -C build/borealis-prototype TomoToolNXBorealis.nro
-	@cp build/borealis-prototype/TomoToolNXBorealis.nro TomoToolNXBorealis.nro
+	+@$(MAKE) --no-print-directory -C build/borealis-prototype TomoToolNXPlusBorealis.nro
+	@cp build/borealis-prototype/TomoToolNXPlusBorealis.nro TomoToolNXPlusBorealis.nro
 
 borealis-prototype-clean:
-	@rm -rf build/borealis-prototype TomoToolNXBorealis.nro
+	@rm -rf build/borealis-prototype TomoToolNXPlusBorealis.nro
 
 #---------------------------------------------------------------------------------
 # setup: one-time clone of libhaze — run this once after cloning the repo

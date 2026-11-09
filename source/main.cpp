@@ -777,7 +777,7 @@ static ScreenFade gFade;
 // Final present wrapper — paints the fade overlay (if active) on top of
 // whatever the current screen rendered, then flips the back buffer.
 // ── Logo easter egg ──────────────────────────────────────────────────────────
-// Tap "TomoToolNX" in the header and the wordmark peels off, bounces and
+// Tap "TomoToolNXPlus" in the header and the wordmark peels off, bounces and
 // stretches across the WHOLE screen like it's alive (springy hops, rubber
 // squash-and-stretch, a couple of cheeky spins, a motion-blur trail), then
 // springs back home. Rendered from Present() so it overlays every screen.
@@ -789,7 +789,7 @@ static void DrawLogoEgg() {
     gEggT -= gDtSec; if (gEggT < 0.f) gEggT = 0.f;
     float elapsed = EGG_DUR - gEggT;
     int lw = 0, lh = 0;
-    SDL_Texture* tex = GetTextTexture("TomoToolNX", Font::Md, COL_GOLD, lw, lh);
+    SDL_Texture* tex = GetTextTexture("TomoToolNXPlus", Font::Md, COL_GOLD, lw, lh);
     if (!tex) return;
     SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
     const float HX = 10.f + lw * 0.5f, HY = 14.f;          // resting spot in the header
@@ -4416,10 +4416,10 @@ static void DrawHeader(const std::string& title) {
     DrawRect(0,27,SCREEN_W,1,COL_BORDER);
     TTF_Font* fsm=GetFont(Font::Sm);
     int tw=0,fh=0;
-    if(fsm) TTF_SizeUTF8(fsm,"TomoToolNX",&tw,&fh);
+    if(fsm) TTF_SizeUTF8(fsm,"TomoToolNXPlus",&tw,&fh);
     int y=(28-fh)/2;
     HitAdd(8, 0, tw+10, 28, TLogoEgg, 0);
-    if (gEggT <= 0.f) DrawText("TomoToolNX",10,y,COL_GOLD);  // hidden while it's off galivanting
+    if (gEggT <= 0.f) DrawText("TomoToolNXPlus",10,y,COL_GOLD);  // hidden while it's off galivanting
     if (!title.empty())
         DrawText(" / "+title, 10+tw, y, COL_DIM);
     int vw=0;
@@ -12394,7 +12394,7 @@ int main(int,char**) {
     IMG_Init(IMG_INIT_PNG|IMG_INIT_JPG);
     TTF_Init();
 
-    SDL_Window* win=SDL_CreateWindow("TomoToolNX",
+    SDL_Window* win=SDL_CreateWindow("TomoToolNXPlus",
         SDL_WINDOWPOS_UNDEFINED,SDL_WINDOWPOS_UNDEFINED,SCREEN_W,SCREEN_H,0);
     gRen=SDL_CreateRenderer(win,-1,SDL_RENDERER_ACCELERATED|SDL_RENDERER_PRESENTVSYNC);
     SDL_SetRenderDrawBlendMode(gRen,SDL_BLENDMODE_BLEND);
