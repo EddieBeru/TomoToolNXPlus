@@ -220,6 +220,17 @@ endif
 #---------------------------------------------------------------------------------
 all: $(BUILD)
 
+.PHONY: borealis-prototype borealis-prototype-clean
+
+# Optional, isolated UI experiment. Keep the default target and app flags intact.
+borealis-prototype:
+	@cmake -S prototype/borealis -B build/borealis-prototype -DCMAKE_BUILD_TYPE=Release
+	+@$(MAKE) --no-print-directory -C build/borealis-prototype TomoToolNXBorealis.nro
+	@cp build/borealis-prototype/TomoToolNXBorealis.nro TomoToolNXBorealis.nro
+
+borealis-prototype-clean:
+	@rm -rf build/borealis-prototype TomoToolNXBorealis.nro
+
 #---------------------------------------------------------------------------------
 # setup: one-time clone of libhaze — run this once after cloning the repo
 #---------------------------------------------------------------------------------
