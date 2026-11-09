@@ -133,10 +133,6 @@ The emulator's system-font rendering shows uneven spacing around some accented
 glyphs (for example Sí and Vacío). Shared-font rendering needs inspection on
 hardware before adopting the framework.
 
-Native 1280 × 720 captures from the adapted emulator copy:
-[Textures](images/borealis-prototype/textures-es.png) and
-[Texture Settings](images/borealis-prototype/settings-es.png).
-
 ## Fork branding
 
 Builds now use `TomoToolNXPlus` as the main artifact and display name, and

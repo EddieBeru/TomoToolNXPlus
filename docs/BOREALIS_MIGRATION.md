@@ -110,6 +110,3 @@ Physical Switch validation of this new configuration workflow, real SD failure
 behavior, dark theme and docked scaling remain pending. Prior user-reported
 hardware success applies to the earlier pilot builds. This slice cannot verify
 game-save compatibility because it does not access game saves.
-
-Native 720p captures: [settings](images/borealis-prototype/settings-v02-es.png)
-and [invalid configuration](images/borealis-prototype/settings-error-v02-es.png).
