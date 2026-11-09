@@ -3,7 +3,8 @@
 **A spec-driven rebuild of the TomoToolNX experience, maintained by EddieBeru.**
 
 TomoToolNXPlus is a fork of [TomoToolNX](https://github.com/miiazertyy/TomoToolNX),
-a Nintendo Switch editor for Tomodachi Life saves. The goal is to turn a useful
+a Nintendo Switch editor for Tomodachi Life saves. Borealis is the approved visual direction for the Switch UI.
+The goal is to turn a useful
 but difficult-to-maintain program into a coherent, predictable tool, with save
 integrity taking priority over everything else.
 
@@ -71,7 +72,7 @@ Borealis v0.2.0 preference workflow has host regression and adapted-emulator
 checks; its physical SD/configuration behavior still needs hardware validation.
 Existing legacy code has not all been brought up to the fork's development rules.
 
-See [the prototype record](docs/BOREALIS_PROTOTYPE.md),
+See [the Borealis port record](docs/BOREALIS_PORT.md),
 [migration boundaries and recovery](docs/BOREALIS_MIGRATION.md), and
 [host regression checks](tests/README.md) for scope and evidence.
 
@@ -98,7 +99,7 @@ included in this repository.
 ```sh
 make setup                 # first checkout: fetch libhaze and apply local overrides
 make -j4                   # TomoToolNXPlus.nro
-make -j4 borealis-prototype # TomoToolNXPlusBorealis.nro
+make -j4 borealis # TomoToolNXPlusBorealis.nro
 ```
 
 Copy the desired NRO into a directory under `/switch/` on the SD card and launch
@@ -119,7 +120,7 @@ Report issues and propose changes in
 
 Legacy Switch translations live in `romfs/lang/`; WebUI translations live in
 `data/webui.html`. Borealis translations live in
-`prototype/borealis/resources/i18n/`. Keep user-facing text localizable and check
+`apps/borealis/resources/i18n/`. Keep user-facing text localizable and check
 longer translations as part of UI work.
 
 ## Credits and license

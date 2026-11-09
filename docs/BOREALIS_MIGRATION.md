@@ -94,7 +94,7 @@ Makefile. The prototype's symbol list contains no SaveMount, SaveEditor,
 SaveWorkflow or HTTP classes; its NACP reads back as EddieBeru / v0.2.0.
 
 The emulator checks used the same temporary libgcc GCS workaround documented in
-BOREALIS_PROTOTYPE.md. The normal deliverable does not contain that workaround.
+BOREALIS_PORT.md. The normal deliverable does not contain that workaround.
 Using a synthetic SD config and keyboard-mapped controller / emulated touch,
 checks passed for loading real values and a custom matte, draft-only editing,
 BC1 disabled-state focus skipping, selector cancellation, dirty Back prompts,

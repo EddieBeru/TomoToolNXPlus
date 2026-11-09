@@ -1,4 +1,4 @@
-# Borealis Switch pilot
+# Borealis Switch port
 
 This is an independent Switch UI migration target. Browser tabs use synthetic
 data; Texture Settings v0.2.0 edits the real application preferences. It does not
@@ -11,25 +11,25 @@ Use the existing devkitPro/libnx installation, Switch SDL2/Mesa portlibs, CMake
 
 ```sh
 make                      # existing TomoToolNXPlus.nro
-make -j4 borealis-prototype # separate TomoToolNXPlusBorealis.nro
-make borealis-prototype-clean
+make -j4 borealis # separate TomoToolNXPlusBorealis.nro
+make borealis-clean
 ```
 
 The optional target uses CMake internally for Borealis's existing build system;
 no dependencies are downloaded or upgraded. Objects, ELF, NACP, map and staged
-ROMFS live in `build/borealis-prototype/`. The NRO is also copied to the project
-root. A failed build does not overwrite the last root prototype artifact.
-`make clean` removes both sets of build intermediates; use the prototype clean
+ROMFS live in `build/borealis/`. The NRO is also copied to the project
+root. A failed build does not overwrite the last root Borealis artifact.
+`make clean` removes both sets of build intermediates; use the Borealis clean
 target to remove its root NRO as well.
 
 Borealis is vendored at `5f08b286f3df737f3321d2247a6fe633fcead03c` from
 https://github.com/xfangfang/borealis. See `libs/borealis/VENDOR.md`, `LICENSE`,
 `NOTICE`, `AUTHORS` and the bundled dependency notices. License texts are also
-included in the prototype ROMFS under `legal/`; the Material Icons license is
+included in the Borealis ROMFS under `legal/`; the Material Icons license is
 under `material/`. The single SDL context-selection patch is documented in `VENDOR.md`. SDL2
 comes from devkitPro.
 
-The pilot uses SDL2/OpenGL ES 2. Borealis owns its window, graphics context,
+The port uses SDL2/OpenGL ES 2. Borealis owns its window, graphics context,
 input and event loop. RTTI and exceptions are enabled only in this separate
 build. The existing SDL renderer and production compiler flags are unchanged.
 Deko3D is not used: the earlier evaluation could not find `glm/vec2.hpp`.
@@ -60,16 +60,32 @@ changes or Keep editing. Disabled rows are skipped and retain their values.
 Touch provides the same controls. Plus/Minus/X/Y remain unbound in this target.
 
 The activity stack restores entry focus and isolates settings/dialogs from tab
-switching. Root tabs retain their cached focus and scroll. Exit pilot remains a
+switching. Root tabs retain their cached focus and scroll. Exit remains a
 focusable/tappable WebUI row. English, Spanish and Latin American Spanish are
 included; other system locales fall back to English.
 
 ## Validation boundaries
 
 A successful host cross-build establishes that an NRO can be produced, not
-hardware usability or game-save compatibility. This pilot contains no save
+hardware usability or game-save compatibility. This port contains no save
 workflow and cannot establish save compatibility. Physical Switch testing is
 required before a production migration.
+
+## Naming and direction
+
+Borealis is the approved visual direction and primary Switch UI migration target.
+Sources live in `apps/borealis/`; build with `make borealis` and clean with
+`make borealis-clean`. The old `borealis-prototype` commands remain compatibility
+aliases. The NRO filename remains `TomoToolNXPlusBorealis.nro`, with launcher title
+`TomoToolNXPlus Borealis` and author EddieBeru. Sample pages still indicate
+unfinished functionality; approving the appearance does not mark migration complete.
+
+Host verification: `make borealis`, its compatibility alias and the default SDL
+build succeeded. The final NRO metadata contains the new title and EddieBeru
+author; locale keys and documentation links were checked. Runtime checks were
+not repeated for this terminology-only change.
+
+The records below retain the terminology and commands used at the time.
 
 ## Verification record (2026-11-08)
 

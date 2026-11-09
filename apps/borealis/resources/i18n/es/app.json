@@ -1,5 +1,5 @@
 {
-  "title": "TomoToolNXPlus · Piloto Borealis",
+  "title": "TomoToolNXPlus · Borealis",
   "webui": "WebUI",
   "textures": "Texturas",
   "mii": "Mii",
@@ -17,7 +17,7 @@
   "tabs": "Volver a la lista de secciones",
   "previous_tab": "Anterior",
   "next_tab": "Siguiente",
-  "exit": "Salir del piloto",
+  "exit": "Salir",
   "shirt": "Camisa de ejemplo",
   "room": "Habitación de ejemplo",
   "empty_slot": "Espacio de textura vacío",

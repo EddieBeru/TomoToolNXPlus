@@ -1,4 +1,4 @@
-#include "pilot.hpp"
+#include "app.hpp"
 
 #include <cstdlib>
 
@@ -8,9 +8,9 @@ int main()
     if (!brls::Application::init())
         return EXIT_FAILURE;
 
-    brls::Application::createWindow(brls::getStr("pilot/title"));
+    brls::Application::createWindow(brls::getStr("app/title"));
     brls::Application::setGlobalQuit(false);
-    brls::Application::pushActivity(new brls::Activity(pilot::createRoot()));
+    brls::Application::pushActivity(new brls::Activity(borealis_app::createRoot()));
 
     while (brls::Application::mainLoop()) {}
     return EXIT_SUCCESS;

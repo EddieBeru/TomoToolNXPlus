@@ -220,16 +220,20 @@ endif
 #---------------------------------------------------------------------------------
 all: $(BUILD)
 
-.PHONY: borealis-prototype borealis-prototype-clean
+.PHONY: borealis borealis-clean borealis-prototype borealis-prototype-clean
 
-# Optional, isolated UI experiment. Keep the default target and app flags intact.
-borealis-prototype:
-	@cmake -S prototype/borealis -B build/borealis-prototype -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release
-	+@$(MAKE) --no-print-directory -C build/borealis-prototype TomoToolNXPlusBorealis.nro
-	@cp build/borealis-prototype/TomoToolNXPlusBorealis.nro TomoToolNXPlusBorealis.nro
+# Separate Switch UI port; the default SDL build remains available.
+borealis:
+	@cmake -S apps/borealis -B build/borealis -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release
+	+@$(MAKE) --no-print-directory -C build/borealis TomoToolNXPlusBorealis.nro
+	@cp build/borealis/TomoToolNXPlusBorealis.nro TomoToolNXPlusBorealis.nro
 
-borealis-prototype-clean:
-	@rm -rf build/borealis-prototype TomoToolNXPlusBorealis.nro
+borealis-clean:
+	@rm -rf build/borealis TomoToolNXPlusBorealis.nro
+
+# Compatibility aliases for existing build scripts.
+borealis-prototype: borealis
+borealis-prototype-clean: borealis-clean
 
 #---------------------------------------------------------------------------------
 # setup: one-time clone of libhaze — run this once after cloning the repo

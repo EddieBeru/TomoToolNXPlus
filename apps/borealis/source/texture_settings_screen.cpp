@@ -4,7 +4,7 @@
 #include <array>
 #include <cstdio>
 
-namespace pilot {
+namespace borealis_app {
 namespace {
 using namespace brls::literals;
 using TextureSettings::Row;
@@ -13,7 +13,7 @@ class SettingsScreen : public brls::AppletFrame {
 public:
     explicit SettingsScreen(const std::string& path)
         : AppletFrame(new brls::ScrollingFrame()), store(path) {
-        setTitle("pilot/settings"_i18n);
+        setTitle("app/settings"_i18n);
         auto* list = new brls::Box(brls::Axis::COLUMN);
         auto style = brls::Application::getStyle();
         list->setPadding(style["brls/sidebar/padding_top"], style["brls/sidebar/padding_right"],
@@ -83,7 +83,7 @@ private:
             case Row::Shape: return {"preferences/square"_i18n, "preferences/book"_i18n, "preferences/tv"_i18n};
             case Row::Encoder: return {"preferences/gamma"_i18n, "preferences/pca"_i18n};
             case Row::Bc1Mode: return {"preferences/auto"_i18n, "preferences/four_color"_i18n, "preferences/three_color"_i18n};
-            case Row::Fit: return {"pilot/cover"_i18n, "pilot/contain"_i18n, "pilot/fill"_i18n};
+            case Row::Fit: return {"app/cover"_i18n, "app/contain"_i18n, "app/fill"_i18n};
             case Row::Background: {
                 std::vector<std::string> values = {
                     "preferences/transparent"_i18n, "preferences/white"_i18n, "preferences/black"_i18n};
@@ -201,4 +201,4 @@ private:
 brls::View* createTextureSettingsScreen(const std::string& configPath) {
     return new SettingsScreen(configPath);
 }
-} // namespace pilot
+} // namespace borealis_app

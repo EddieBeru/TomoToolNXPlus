@@ -1,11 +1,11 @@
-#include "pilot.hpp"
+#include "app.hpp"
 #include "texture_settings_screen.hpp"
 #include "texture_settings_store.h"
 
 #include <array>
 #include <functional>
 
-namespace pilot
+namespace borealis_app
 {
 namespace
 {
@@ -66,39 +66,39 @@ public:
         addView(content);
 
         const std::array<std::string, 5> names = {
-            "pilot/webui"_i18n, "pilot/textures"_i18n, "pilot/mii"_i18n,
-            "pilot/player"_i18n, "pilot/map"_i18n};
+            "app/webui"_i18n, "app/textures"_i18n, "app/mii"_i18n,
+            "app/player"_i18n, "app/map"_i18n};
         const std::array<std::string, 5> descriptions = {
-            "pilot/webui_note"_i18n, "pilot/textures_note"_i18n, "pilot/mii_note"_i18n,
-            "pilot/player_note"_i18n, "pilot/map_note"_i18n};
+            "app/webui_note"_i18n, "app/textures_note"_i18n, "app/mii_note"_i18n,
+            "app/player_note"_i18n, "app/map_note"_i18n};
 
         for (size_t i = 0; i < pages.size(); ++i)
         {
             auto* list = makeList(names[i], descriptions[i]);
             if (i == 1)
             {
-                addAction(list, "pilot/settings"_i18n, "hints/open"_i18n,
+                addAction(list, "app/settings"_i18n, "hints/open"_i18n,
                     [this](brls::View*) {
                         brls::Application::pushActivity(new brls::Activity(createTextureSettingsScreen(TextureSettings::ConfigPath)));
                     });
-                addSample(list, "pilot/shirt"_i18n, "pilot/ready"_i18n);
-                addSample(list, "pilot/room"_i18n, "pilot/ready"_i18n);
-                addSample(list, "pilot/empty_slot"_i18n, "pilot/empty"_i18n);
+                addSample(list, "app/shirt"_i18n, "app/ready"_i18n);
+                addSample(list, "app/room"_i18n, "app/ready"_i18n);
+                addSample(list, "app/empty_slot"_i18n, "app/empty"_i18n);
             }
             else if (i == 0)
             {
-                addAction(list, "pilot/exit"_i18n, "", [](brls::View*) {
+                addAction(list, "app/exit"_i18n, "", [](brls::View*) {
                     brls::Application::quit();
                 });
             }
             else
             {
-                addSample(list, brls::getStr("pilot/sample_" + std::to_string(i)),
-                    "pilot/fictional"_i18n);
+                addSample(list, brls::getStr("app/sample_" + std::to_string(i)),
+                    "app/fictional"_i18n);
             }
-            addAction(list, "pilot/tabs"_i18n, "", [this](brls::View*) { focusSidebar(); });
+            addAction(list, "app/tabs"_i18n, "", [this](brls::View*) { focusSidebar(); });
             pages[i] = scroll(list);
-            pages[i]->registerAction("pilot/tabs_hint"_i18n, brls::BUTTON_B,
+            pages[i]->registerAction("app/tabs_hint"_i18n, brls::BUTTON_B,
                 [this](brls::View*) { focusSidebar(); return true; }, false, false, brls::SOUND_BACK);
         }
 
@@ -110,9 +110,9 @@ public:
             sidebar->getItem(i)->registerAction("", brls::BUTTON_B,
                 [](brls::View*) { return true; }, true);
         }
-        registerAction("pilot/previous_tab"_i18n, brls::BUTTON_LT,
+        registerAction("app/previous_tab"_i18n, brls::BUTTON_LT,
             [this](brls::View*) { switchTab(-1); return true; });
-        registerAction("pilot/next_tab"_i18n, brls::BUTTON_RT,
+        registerAction("app/next_tab"_i18n, brls::BUTTON_RT,
             [this](brls::View*) { switchTab(1); return true; });
     }
 
@@ -128,7 +128,7 @@ private:
     void addSample(brls::Box* list, const std::string& name, const std::string& detail)
     {
         addAction(list, name, detail, [](brls::View*) {
-            auto* dialog = new brls::Dialog("pilot/sample_note"_i18n);
+            auto* dialog = new brls::Dialog("app/sample_note"_i18n);
             dialog->addButton("hints/back"_i18n, [] {});
             dialog->open();
         });
@@ -167,9 +167,9 @@ private:
 brls::View* createRoot()
 {
     auto* frame = new brls::AppletFrame(new Navigation());
-    frame->setTitle("pilot/title"_i18n);
-    // The pilot has an explicit focusable Exit control instead of a root B exit.
+    frame->setTitle("app/title"_i18n);
+    // The app has an explicit focusable Exit control instead of a root B exit.
     frame->registerAction("", brls::BUTTON_B, [](brls::View*) { return true; }, true);
     return frame;
 }
-} // namespace pilot
+} // namespace borealis_app

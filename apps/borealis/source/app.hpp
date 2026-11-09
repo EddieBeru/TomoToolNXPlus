@@ -2,7 +2,7 @@
 
 #include <borealis.hpp>
 
-namespace pilot
+namespace borealis_app
 {
 brls::View* createRoot();
 }
