@@ -48,6 +48,37 @@ custom theme, palette or theme picker. If a future migration is approved,
 remove those controls from migrated screens while preserving old configuration
 keys without rewriting them. That migration is a separate task.
 
+## Sample and controls
+
+The top-level destinations retain the application's names: WebUI, Textures,
+Mii, Player and Map, presented with the standard Borealis Switch sidebar.
+The Textures page contains fictional slots and a focusable Texture Settings
+entry. Settings opens a separate activity with standard boolean and selector
+cells and a Back row. Values live only in RAM, including when the child is
+reopened, and reset on exit. Other sample rows open an informational dialog.
+
+- ZL/ZR: previous/next top-level tab, wrapping at the ends and restoring the
+  last content focus. They are unavailable in the child screen and dialogs.
+- D-pad or left stick: standard Borealis focus navigation. The sidebar also
+  supports choosing a destination and A enters that destination's content.
+- A: activate a row, enter settings, toggle the demo switch, or open a selector.
+- B: close the innermost dialog/selector, return from settings to its entry row,
+  or return from tab content to the sidebar. B at the sidebar does nothing.
+- Touch: tap sidebar destinations, rows, selector choices, the Back row/footer
+  hint or Return to tab list. Each essential action has both routes.
+- Exit pilot: focusable/tappable row in WebUI. Plus, Minus, X and Y have no
+  pilot actions. There is no Save action because the pilot has no user data.
+
+`Navigation` in `prototype/borealis/source/pilot.cpp` owns tab selection and
+shared bindings. Cached pages keep focus, scroll and local state. Borealis's
+activity stack handles child/modal isolation and return focus. This deliberately
+does not use `TabFrame`, which destroys/recreates its page when changing tabs.
+There are no new subtabs, renderer customizations, or global theme/style edits.
+
+All pilot strings use Borealis i18n resources. English, Spanish and Latin
+American Spanish are included; other system locales fall back to English.
+Production language files and configuration are not read or rewritten.
+
 ## Validation boundaries
 
 A successful host cross-build establishes that an NRO can be produced, not

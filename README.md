@@ -236,6 +236,11 @@ make
 
 Out comes `TomoToolNX.nro`. Every build after the first is just `make`.
 
+An optional, isolated Switch UI pilot is available with `make borealis-prototype`.
+It produces `TomoToolNXBorealis.nro` with fictional data and no save access.
+See [the Borealis pilot notes](docs/BOREALIS_PROTOTYPE.md) for controls,
+dependencies and validation limits.
+
 </details>
 
 ---

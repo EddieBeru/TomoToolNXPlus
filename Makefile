@@ -224,7 +224,7 @@ all: $(BUILD)
 
 # Optional, isolated UI experiment. Keep the default target and app flags intact.
 borealis-prototype:
-	@cmake -S prototype/borealis -B build/borealis-prototype -DCMAKE_BUILD_TYPE=Release
+	@cmake -S prototype/borealis -B build/borealis-prototype -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release
 	+@$(MAKE) --no-print-directory -C build/borealis-prototype TomoToolNXBorealis.nro
 	@cp build/borealis-prototype/TomoToolNXBorealis.nro TomoToolNXBorealis.nro
 

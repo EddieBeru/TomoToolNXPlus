@@ -1,4 +1,5 @@
-#include <borealis.hpp>
+#include "pilot.hpp"
+
 #include <cstdlib>
 
 int main()
@@ -7,20 +8,9 @@ int main()
     if (!brls::Application::init())
         return EXIT_FAILURE;
 
-    brls::Application::createWindow("TomoToolNX Borealis Pilot");
+    brls::Application::createWindow(brls::getStr("pilot/title"));
     brls::Application::setGlobalQuit(false);
-
-    auto* content = new brls::Box(brls::Axis::COLUMN);
-    auto* exit = new brls::Button();
-    exit->setText("Exit pilot");
-    exit->registerClickAction([](brls::View*) {
-        brls::Application::quit();
-        return true;
-    });
-    content->addView(exit);
-    auto* frame = new brls::AppletFrame(content);
-    frame->setTitle("TomoToolNX Borealis Pilot");
-    brls::Application::pushActivity(new brls::Activity(frame));
+    brls::Application::pushActivity(new brls::Activity(pilot::createRoot()));
 
     while (brls::Application::mainLoop()) {}
     return EXIT_SUCCESS;
