@@ -20,6 +20,8 @@
 #include "mtp_server.h"
 
 #include "save_editor.h"
+#include "save_workflow.h"
+#include "backup_snapshot.h"
 #include "map_data.h"
 #include "belongings_data.h"
 #include "habits_data.h"
@@ -1266,9 +1268,12 @@ static int  gRelDatePairIdx = -1;
 
 // Back-prompt state
 static bool gShowBackPrompt       = false;
-static bool gBackPromptIsMii      = false;
 static bool gBackPromptToUserPick = false; // true = save/discard→UserPick; false = save/discard→quit app
 static bool gQuitApp              = false;
+static SaveWorkflow::Result gSaveFailure;
+static std::string gSaveRecoveryBackup;
+static bool gSaveAfterBackup = false;
+static bool gSaveRequestsStopped = false;
 
 // Save-feedback state (brief "Saved!" screen after B or + save)
 static int  gSaveFeedbackFrames = 0;
@@ -2501,6 +2506,7 @@ static void BlRebuildFilter() {
 // toggles flip immediately. We never persist the running state — that
 // would let a Ryujinx user crash on every boot in an infinite loop.
 static void TToggleMtp(int) {
+    if (gSaveRequestsStopped) { gShowBackPrompt = true; return; }
     if (MtpServer::IsRunning()) {
         MtpServer::Exit();
         return;
@@ -5157,6 +5163,7 @@ static void DrawBackupPrompt() {
 }
 
 static void DrawBackingUp() {
+    HitClear();
     SDL_SetRenderDrawColor(gRen,COL_BG.r,COL_BG.g,COL_BG.b, 255);
     SDL_RenderClear(gRen);
     DrawHeader("");
@@ -11030,27 +11037,63 @@ static void DrawSaveWarning() {
     Present();
 }
 
-static void TAckBackYes(int) {
-    gShowBackPrompt = false;
-    if (gBackPromptIsMii && gMiiSavDirty) {
-        std::string err = SaveEditor::Save(SAVE_MII_SAV, gMiiSav);
-        if (err.empty()) { SaveMount::Commit(); gMiiSavDirty=false; }
+static bool HasPendingSaveChanges() {
+    return gPlayerSavDirty || gMiiSavDirty || gMapDirty || gUgcDirty || gWebUiDirty ||
+           !gSaveFailure.error.empty();
+}
+
+static const SaveEditor::SavFile& PendingSaveFile(SaveWorkflow::File file) {
+    switch (file) {
+        case SaveWorkflow::File::Mii: return gMiiSav;
+        case SaveWorkflow::File::Player: return gPlayerSav;
+        case SaveWorkflow::File::Map: return gMapSav;
     }
-    if (!gBackPromptIsMii && gPlayerSavDirty) {
-        std::string err = SaveEditor::Save(SAVE_PLAYER_SAV, gPlayerSav);
-        if (err.empty()) { SaveMount::Commit(); gPlayerSavDirty=false; }
+    return gPlayerSav;
+}
+
+static const char* PendingSavePath(SaveWorkflow::File file) {
+    switch (file) {
+        case SaveWorkflow::File::Mii: return SAVE_MII_SAV;
+        case SaveWorkflow::File::Player: return SAVE_PLAYER_SAV;
+        case SaveWorkflow::File::Map: return SAVE_MAP_SAV;
     }
-    // Map.sav is independent of which tab triggered the prompt — commit it
-    // whenever it's dirty. Before saving, prune any house that's now empty
-    // (vacated by the user and not re-populated) so the game doesn't keep
-    // residentless house actors around on the island.
+    return SAVE_PLAYER_SAV;
+}
+
+static void FinishSaveAndExit() {
+    SDL_SetRenderDrawColor(gRen, COL_BG.r, COL_BG.g, COL_BG.b, 255);
+    SDL_RenderClear(gRen);
+    DrawTextC(Lang::T("save.progress"), SCREEN_W / 2, SCREEN_H / 2, COL_TEXT, Font::Md);
+    Present();
     HousingCleanupEmptyHouses();
-    if (gMapDirty) {
-        std::string err = SaveEditor::Save(SAVE_MAP_SAV, gMapSav);
-        if (err.empty()) { SaveMount::Commit(); gMapDirty=false; }
+    const SaveWorkflow::Pending pending{gMiiSavDirty, gPlayerSavDirty, gMapDirty,
+                                        gUgcDirty || gWebUiDirty};
+    const SaveWorkflow::Operations operations{
+        []() {
+            if (!SaveMount::IsMounted()) return std::string("Save is not mounted");
+            return BackupSnapshot::Validate(gSaveRecoveryBackup);
+        },
+        [](SaveWorkflow::File file) { return SaveEditor::ValidateForWrite(PendingSaveFile(file)); },
+        [](SaveWorkflow::File file) { return SaveEditor::Save(PendingSavePath(file), PendingSaveFile(file)); },
+        []() { return SaveMount::Commit(); },
+    };
+    const auto result = SaveWorkflow::Run(pending, operations);
+    if (!result.error.empty()) {
+        const bool previousWrites = gSaveFailure.writesAttempted;
+        gSaveFailure = result;
+        gSaveFailure.writesAttempted |= previousWrites;
+        gShowBackPrompt = true;
+        return;
     }
-    if (gUgcDirty) { SaveMount::Commit(); gUgcDirty=false; }
-    if (gWebUiDirty) { SaveMount::Commit(); gWebUiDirty=false; }
+    if (gUserSel >= 0 && gUserSel < static_cast<int>(gUsers.size())) {
+        const std::string tag = SaveMount::SafeUserFolder(gUsers[gUserSel]);
+        const int excess = BackupService::CountBackups(tag) - gMaxBackups;
+        for (int i = 0; i < excess; ++i) BackupService::DeleteOldestBackup(tag);
+    }
+    gShowBackPrompt = false;
+    gSaveFailure = {};
+    gSaveRecoveryBackup.clear();
+    gSaveRequestsStopped = false;
     FreePreview(); HttpServer::Stop(); gLog.clear();
     gEntries.clear(); gMiis.clear();
     gPlayerSav=SaveEditor::SavFile{}; gMiiSav=SaveEditor::SavFile{}; gMapSav=SaveEditor::SavFile{};
@@ -11063,7 +11106,29 @@ static void TAckBackYes(int) {
     gSaveFeedbackFrames=90; gSaveFeedbackQuit=!gBackPromptToUserPick;
     gScreen=Screen::SaveFeedback;
 }
+static void TAckBackYes(int) {
+    HitClear();
+    HttpServer::Stop();
+    MtpServer::Exit();
+    gSaveRequestsStopped = true;
+    if (HttpServer::HasPendingCommit()) gWebUiDirty = true;
+    if (!gSaveRecoveryBackup.empty()) { FinishSaveAndExit(); return; }
+    if (gUserSel < 0 || gUserSel >= static_cast<int>(gUsers.size())) {
+        gSaveFailure.error = Lang::T("save.error.user");
+        gShowBackPrompt = true;
+        return;
+    }
+    BackupService::StartFullBackup("tomodata:/", SaveMount::SafeUserFolder(gUsers[gUserSel]));
+    gSaveAfterBackup = true;
+    gScreen = Screen::BackingUp;
+    DrawBackingUp();
+}
+
 static void TAckBackNo(int) {
+    HitClear();
+    if (!gSaveFailure.error.empty()) { gShowBackPrompt = false; return; }
+    gSaveRecoveryBackup.clear();
+    gSaveRequestsStopped = false;
     gShowBackPrompt = false;
     FreePreview(); HttpServer::Stop(); gLog.clear();
     gEntries.clear(); gMiis.clear();
@@ -11219,10 +11284,44 @@ static void TConfirmBgRemove(int) {
     gOnSwitchMsgCol = COL_GREEN;
 }
 
+static void DrawSaveFailure() {
+    const int width = 1100, height = 330;
+    const int x = (SCREEN_W - width) / 2, y = (SCREEN_H - height) / 2;
+    FillRect(x, y, width, height, COL_PANEL);
+    DrawRect(x, y, width, height, COL_RED);
+    auto line = [&](const std::string& text, int cy, SDL_Color color) {
+        int w = 0, h = 0;
+        SDL_Texture* texture = GetTextTexture(text, Font::Sm, color, w, h);
+        if (!texture || w <= 0) return;
+        const float scale = std::min(1.0f, static_cast<float>(width - 48) / w);
+        SDL_Rect dst{SCREEN_W / 2 - static_cast<int>(w * scale) / 2,
+                     cy - static_cast<int>(h * scale) / 2,
+                     static_cast<int>(w * scale), static_cast<int>(h * scale)};
+        SDL_RenderCopy(gRen, texture, nullptr, &dst);
+    };
+    DrawTextC(Lang::T("save.error.title"), SCREEN_W / 2, y + 32, COL_RED, Font::Lg);
+    line(gSaveFailure.error, y + 80, COL_TEXT);
+    line(Lang::T("save.error.retained"), y + 116, COL_TEXT);
+    line(Lang::T("save.error.partial"), y + 150, COL_DIM);
+    line(Lang::T("save.error.paused"), y + 184, COL_DIM);
+    const int buttonY = y + 235;
+    HitAdd(SCREEN_W / 2 - 270, buttonY, 250, 48, TAckBackYes, 0);
+    HitAdd(SCREEN_W / 2 + 20, buttonY, 250, 48, TAckBackNo, 0);
+    FillRect(SCREEN_W / 2 - 270, buttonY, 250, 48, COL_SEL);
+    FillRect(SCREEN_W / 2 + 20, buttonY, 250, 48, COL_SEL);
+    DrawRect(SCREEN_W / 2 - 270, buttonY, 250, 48, COL_GREEN);
+    DrawRect(SCREEN_W / 2 + 20, buttonY, 250, 48, COL_BORDER);
+    DrawTextC("A  " + Lang::T("save.error.retry"), SCREEN_W / 2 - 145, buttonY + 24, COL_GREEN);
+    DrawTextC("B  " + Lang::T("save.error.edit"), SCREEN_W / 2 + 145, buttonY + 24, COL_ACCENT);
+    DrawFooter(Lang::T("save.error.footer"));
+    Present();
+}
+
 static void DrawBackPrompt() {
     HitClear();
     SDL_SetRenderDrawColor(gRen, COL_BG.r, COL_BG.g, COL_BG.b, 255);
     SDL_RenderClear(gRen);
+    if (!gSaveFailure.error.empty()) { DrawSaveFailure(); return; }
     const int mW=540, mH=200;
     int mx=(SCREEN_W-mW)/2, my=(SCREEN_H-mH)/2;
     FillRect(mx, my, mW, mH, {20,24,20,255});
@@ -12356,7 +12455,7 @@ int main(int,char**) {
         if (gQuitApp) break;
 
         // + returns to user select globally; OnSwitch tabs handle it themselves (auto-save)
-        bool plusOwned = gScreen == Screen::OnSwitch;
+        bool plusOwned = gScreen == Screen::OnSwitch || (gScreen == Screen::BackingUp && gSaveAfterBackup);
         if ((kDown&HidNpadButton_Plus) && !plusOwned) break;
 
         kDown |= gSimKDown;
@@ -12823,7 +12922,6 @@ int main(int,char**) {
             if (kDown&HidNpadButton_A) {
                 std::string uTag = (gUserSel >= 0 && gUserSel < (int)gUsers.size())
                                  ? SaveMount::SafeUserFolder(gUsers[gUserSel]) : std::string();
-                if (gBackupFull) BackupService::DeleteOldestBackup(uTag);
                 BackupService::StartFullBackup("tomodata:/", uTag);
                 gScreen=Screen::BackingUp;
             }
@@ -12835,21 +12933,40 @@ int main(int,char**) {
 
         case Screen::BackingUp:
             if (BackupService::BackupDone()) {
-                // The bundle-apply path uses this same screen to snapshot
-                // a user's existing save before the overwrite. When that
-                // flag is set, hand off to FinishBundleApply instead of
-                // dropping straight into OnSwitch.
-                if (gApplyBundleAfterBackup) {
-                    BackupService::Cleanup();
-                    int idx = gApplyBundleUserIdx;
+                const std::string error = BackupService::BackupError();
+                const std::string backupPath = BackupService::CompletedBackupPath();
+                BackupService::Cleanup();
+                if (gSaveAfterBackup) {
+                    gSaveAfterBackup = false;
+                    gScreen = Screen::OnSwitch;
+                    if (!error.empty()) {
+                        gSaveFailure.error = error;
+                        gShowBackPrompt = true;
+                    } else {
+                        gSaveRecoveryBackup = backupPath;
+                        FinishSaveAndExit();
+                    }
+                } else if (!error.empty()) {
                     gApplyBundleAfterBackup = false;
-                    gApplyBundleUserIdx     = -1;
-                    FinishBundleApply(idx);
+                    gApplyBundleUserIdx = -1;
+                    gError = Lang::T("save.error.backup") + " " + error;
+                    gScreen = Screen::Error;
                 } else {
-                    gScreen=Screen::OnSwitch;
+                    const int userIndex = gApplyBundleAfterBackup ? gApplyBundleUserIdx : gUserSel;
+                    if (userIndex >= 0 && userIndex < static_cast<int>(gUsers.size())) {
+                        const std::string tag = SaveMount::SafeUserFolder(gUsers[userIndex]);
+                        const int excess = BackupService::CountBackups(tag) - gMaxBackups;
+                        for (int i = 0; i < excess; ++i) BackupService::DeleteOldestBackup(tag);
+                    }
+                    if (gApplyBundleAfterBackup) {
+                        const int idx = gApplyBundleUserIdx;
+                        gApplyBundleAfterBackup = false;
+                        gApplyBundleUserIdx = -1;
+                        FinishBundleApply(idx);
+                    } else gScreen = Screen::OnSwitch;
                 }
             }
-            DrawBackingUp();
+            if (gScreen == Screen::BackingUp) DrawBackingUp();
             break;
 
         case Screen::Mounting:
@@ -12860,7 +12977,7 @@ int main(int,char**) {
 
         case Screen::OnSwitch:
             // On first entry: start HTTP server, scan UGC and Miis
-            if (gEntries.empty() && gMiis.empty()) {
+            if (gEntries.empty() && gMiis.empty() && !gSaveRequestsStopped) {
                 gIP=SaveMount::GetLocalIP();
                 if (gIP.empty()) gIP="?.?.?.?";
                 HttpServer::Start(HTTP_PORT, SAVE_UGC_PATH);
@@ -12875,85 +12992,87 @@ int main(int,char**) {
                 gOnSwitchMsg="";
                 if (!gEntries.empty()) LoadPreview(gEntries[0]);
             }
-            // HTTP server events — process regardless of active tab
-            {
-                std::vector<HttpServer::LogEntry> httpLogs;
-                HttpServer::DrainLog(httpLogs);
-                for (auto& hl:httpLogs) Log(hl.text, hl.isError?COL_RED:COL_GOLD);
-            }
-            if (HttpServer::HasPendingImport()) {
-                auto job=HttpServer::TakePendingImport();
-                std::string importErr=TextureProcessor::ImportPng(job.opts);
-                remove(job.tmpPath.c_str());
-                HttpServer::FinishImport(importErr);
-                if (!importErr.empty()) LogERR("Import: "+importErr);
-                else { LogOK("Import OK"); gEntries=UgcScanner::Scan(SAVE_UGC_PATH);
-                       MiiManager::LoadUgcNames();
-                       RebuildUgcFilter();
-                       if (!gEntries.empty()) LoadPreview(gEntries[gEntrySel < (int)gEntries.size() ? gEntrySel : 0]); }
-            }
-            if (HttpServer::HasPendingBgRemove()) {
-                auto job = HttpServer::TakePendingBgRemove();
-                DrawBgRemoving();
-                RgbaImage img;
-                std::string bgErr = TextureProcessor::DecodeFile(job.ugctexPath, img, false);
-                BgAnimState bgAnim{};
-                if (bgErr.empty()) bgErr = U2Net::RemoveBackground(img, kBgModelPath, OnBgRemoveProgress, &bgAnim);
-                if (bgErr.empty()) bgErr = TextureProcessor::ImportRgbaImage(img, job.opts);
-                HttpServer::FinishBgRemove(bgErr);
-                if (!bgErr.empty()) LogERR("BgRemove: "+bgErr);
-                else { LogOK("BgRemove OK"); gEntries=UgcScanner::Scan(SAVE_UGC_PATH);
-                       MiiManager::LoadUgcNames();
-                       RebuildUgcFilter();
-                       if (!gEntries.empty()) LoadPreview(gEntries[gEntrySel < (int)gEntries.size() ? gEntrySel : 0]);
-                       gUgcDirty=true; }
-            }
-            if (HttpServer::HasPendingCommit()) {
-                HttpServer::ClearPendingCommit();
-                gWebUiDirty = true;
-                LogINF("WebUI change pending — will save on exit");
-            }
-            if (HttpServer::HasPendingMiiRefresh()) {
-                HttpServer::ClearPendingMiiRefresh();
-                gMiis = MiiManager::ListMiis();
-                if (gMiiStatsMiiSel >= (int)gMiis.size()) gMiiStatsMiiSel = std::max(0, (int)gMiis.size()-1);
-                if (!gMiiSavDirty) {
-                    gMiiSav = SaveEditor::SavFile{};
-                    std::string lerr;
-                    if (SaveEditor::Load(SAVE_MII_SAV, gMiiSav, lerr))
-                        gMiiSavDirty = true;
+            if (!gSaveRequestsStopped) {
+                // HTTP server events — process regardless of active tab
+                {
+                    std::vector<HttpServer::LogEntry> httpLogs;
+                    HttpServer::DrainLog(httpLogs);
+                    for (auto& hl:httpLogs) Log(hl.text, hl.isError?COL_RED:COL_GOLD);
                 }
-                LogOK("Mii list updated");
-            }
-            if (HttpServer::HasPendingPlayerSavReload()) {
-                HttpServer::ClearPendingPlayerSavReload();
-                if (gPlayerSav.loaded) {
-                    std::string lerr;
-                    SaveEditor::Load(SAVE_PLAYER_SAV, gPlayerSav, lerr);
-                    gPlayerSavDirty = false;
-                    memset(gPlayerUndoValid, 0, sizeof(gPlayerUndoValid));
-                    gNameLangUndoValid = false; gIslandLangUndoValid = false;
-                    gPlayerStampUndoValid = false;
-                    LogOK("Player save synced from WebUI");
+                if (HttpServer::HasPendingImport()) {
+                    auto job=HttpServer::TakePendingImport();
+                    std::string importErr=TextureProcessor::ImportPng(job.opts);
+                    remove(job.tmpPath.c_str());
+                    HttpServer::FinishImport(importErr);
+                    if (!importErr.empty()) LogERR("Import: "+importErr);
+                    else { LogOK("Import OK"); gEntries=UgcScanner::Scan(SAVE_UGC_PATH);
+                           MiiManager::LoadUgcNames();
+                           RebuildUgcFilter();
+                           if (!gEntries.empty()) LoadPreview(gEntries[gEntrySel < (int)gEntries.size() ? gEntrySel : 0]); }
                 }
-            }
-            if (HttpServer::HasPendingMiiSavReload()) {
-                HttpServer::ClearPendingMiiSavReload();
-                if (gMiiSav.loaded) {
-                    std::string lerr;
-                    SaveEditor::Load(SAVE_MII_SAV, gMiiSav, lerr);
-                    gMiiSavDirty = false;
-                    memset(gMiiUndoValid, 0, sizeof(gMiiUndoValid));
-                    gWordUndo.valid = false;
-                    LogOK("Mii save synced from WebUI");
+                if (HttpServer::HasPendingBgRemove()) {
+                    auto job = HttpServer::TakePendingBgRemove();
+                    DrawBgRemoving();
+                    RgbaImage img;
+                    std::string bgErr = TextureProcessor::DecodeFile(job.ugctexPath, img, false);
+                    BgAnimState bgAnim{};
+                    if (bgErr.empty()) bgErr = U2Net::RemoveBackground(img, kBgModelPath, OnBgRemoveProgress, &bgAnim);
+                    if (bgErr.empty()) bgErr = TextureProcessor::ImportRgbaImage(img, job.opts);
+                    HttpServer::FinishBgRemove(bgErr);
+                    if (!bgErr.empty()) LogERR("BgRemove: "+bgErr);
+                    else { LogOK("BgRemove OK"); gEntries=UgcScanner::Scan(SAVE_UGC_PATH);
+                           MiiManager::LoadUgcNames();
+                           RebuildUgcFilter();
+                           if (!gEntries.empty()) LoadPreview(gEntries[gEntrySel < (int)gEntries.size() ? gEntrySel : 0]);
+                           gUgcDirty=true; }
                 }
-            }
-            if (HttpServer::HasPendingMapSavReload()) {
-                HttpServer::ClearPendingMapSavReload();
-                if (gMapSav.loaded) {
-                    std::string lerr;
-                    SaveEditor::Load(SAVE_MAP_SAV, gMapSav, lerr);
-                    LogOK("Map save synced from WebUI");
+                if (HttpServer::HasPendingCommit()) {
+                    HttpServer::ClearPendingCommit();
+                    gWebUiDirty = true;
+                    LogINF("WebUI change pending — will save on exit");
+                }
+                if (HttpServer::HasPendingMiiRefresh()) {
+                    HttpServer::ClearPendingMiiRefresh();
+                    gMiis = MiiManager::ListMiis();
+                    if (gMiiStatsMiiSel >= (int)gMiis.size()) gMiiStatsMiiSel = std::max(0, (int)gMiis.size()-1);
+                    if (!gMiiSavDirty) {
+                        gMiiSav = SaveEditor::SavFile{};
+                        std::string lerr;
+                        if (SaveEditor::Load(SAVE_MII_SAV, gMiiSav, lerr))
+                            gMiiSavDirty = true;
+                    }
+                    LogOK("Mii list updated");
+                }
+                if (HttpServer::HasPendingPlayerSavReload()) {
+                    HttpServer::ClearPendingPlayerSavReload();
+                    if (gPlayerSav.loaded) {
+                        std::string lerr;
+                        SaveEditor::Load(SAVE_PLAYER_SAV, gPlayerSav, lerr);
+                        gPlayerSavDirty = false;
+                        memset(gPlayerUndoValid, 0, sizeof(gPlayerUndoValid));
+                        gNameLangUndoValid = false; gIslandLangUndoValid = false;
+                        gPlayerStampUndoValid = false;
+                        LogOK("Player save synced from WebUI");
+                    }
+                }
+                if (HttpServer::HasPendingMiiSavReload()) {
+                    HttpServer::ClearPendingMiiSavReload();
+                    if (gMiiSav.loaded) {
+                        std::string lerr;
+                        SaveEditor::Load(SAVE_MII_SAV, gMiiSav, lerr);
+                        gMiiSavDirty = false;
+                        memset(gMiiUndoValid, 0, sizeof(gMiiUndoValid));
+                        gWordUndo.valid = false;
+                        LogOK("Mii save synced from WebUI");
+                    }
+                }
+                if (HttpServer::HasPendingMapSavReload()) {
+                    HttpServer::ClearPendingMapSavReload();
+                    if (gMapSav.loaded) {
+                        std::string lerr;
+                        SaveEditor::Load(SAVE_MAP_SAV, gMapSav, lerr);
+                        LogOK("Map save synced from WebUI");
+                    }
                 }
             }
             // Thumb tip modal
@@ -12980,9 +13099,9 @@ int main(int,char**) {
             // Back-prompt modal
             if (gShowBackPrompt) {
                 if (kDown & HidNpadButton_A) TAckBackYes(0);
-                if (kDown & HidNpadButton_B) TAckBackNo(0);
-                if (kDown & HidNpadButton_X) gShowBackPrompt = false;
-                if (gShowBackPrompt) DrawBackPrompt();
+                else if (kDown & HidNpadButton_B) TAckBackNo(0);
+                else if (kDown & HidNpadButton_X) gShowBackPrompt = false;
+                if (gShowBackPrompt && gScreen == Screen::OnSwitch) DrawBackPrompt();
                 break;
             }
             // Category picker (UGC tab) — modal owns input while open. We
@@ -13215,11 +13334,11 @@ int main(int,char**) {
                         // without falling through to back-to-user-pick.
                         TCancelUgcDelete(0);
                     } else {
-                        bool hasDirty = gPlayerSavDirty || gMiiSavDirty || gUgcDirty || gWebUiDirty;
+                        bool hasDirty = HasPendingSaveChanges();
                         bool toUserPick = (kDown&HidNpadButton_Plus) == 0;
                         if (hasDirty) {
                             gShowBackPrompt=true;
-                            gBackPromptIsMii=gMiiSavDirty; gBackPromptToUserPick=toUserPick;
+                            gBackPromptToUserPick=toUserPick;
                         } else if (toUserPick) {
                             FreePreview(); HttpServer::Stop(); gLog.clear();
                             gEntries.clear(); gMiis.clear();
@@ -13253,8 +13372,8 @@ int main(int,char**) {
                 // B = back to user pick, Plus = quit app (both prompt when dirty)
                 if (kDown&(HidNpadButton_B|HidNpadButton_Plus)) {
                     bool toUserPick = (kDown&HidNpadButton_B) != 0;
-                    if (gPlayerSavDirty || gUgcDirty || gWebUiDirty) {
-                        gShowBackPrompt=true; gBackPromptIsMii=false; gBackPromptToUserPick=toUserPick;
+                    if (HasPendingSaveChanges()) {
+                        gShowBackPrompt=true; gBackPromptToUserPick=toUserPick;
                     } else if (toUserPick) {
                         FreePreview(); HttpServer::Stop(); gLog.clear();
                         gEntries.clear(); gMiis.clear();
@@ -14333,8 +14452,8 @@ int main(int,char**) {
                         ShareCloseDetail();
                     } else {
                         bool toUserPick = (kDown&HidNpadButton_B) != 0;
-                        if (gMiiSavDirty || gUgcDirty || gWebUiDirty) {
-                            gShowBackPrompt=true; gBackPromptIsMii=true; gBackPromptToUserPick=toUserPick;
+                        if (HasPendingSaveChanges()) {
+                            gShowBackPrompt=true; gBackPromptToUserPick=toUserPick;
                         } else if (toUserPick) {
                             FreePreview(); HttpServer::Stop(); gLog.clear();
                             gEntries.clear(); gMiis.clear();
@@ -14377,10 +14496,10 @@ int main(int,char**) {
                     break;
                 }
                 if (kDown&HidNpadButton_Plus) {
-                    bool hasDirty = gPlayerSavDirty || gMiiSavDirty || gUgcDirty || gWebUiDirty;
+                    bool hasDirty = HasPendingSaveChanges();
                     if (hasDirty) {
                         gShowBackPrompt=true;
-                        gBackPromptIsMii=gMiiSavDirty; gBackPromptToUserPick=false;
+                        gBackPromptToUserPick=false;
                     } else { gQuitApp=true; }
                 }
 
@@ -14604,12 +14723,10 @@ int main(int,char**) {
                     // tabs. + lets the global handler take over for quit.
                     if (kDown&(HidNpadButton_B|HidNpadButton_Plus)) {
                         if (gMapStroking) MapStrokeEnd();
-                        bool hasDirty = gMapDirty || gPlayerSavDirty || gMiiSavDirty
-                                      || gUgcDirty || gWebUiDirty;
+                        bool hasDirty = HasPendingSaveChanges();
                         bool toUserPick = (kDown&HidNpadButton_Plus) == 0;
                         if (hasDirty) {
                             gShowBackPrompt       = true;
-                            gBackPromptIsMii      = gMiiSavDirty;
                             gBackPromptToUserPick = toUserPick;
                         } else if (toUserPick) {
                             FreePreview(); HttpServer::Stop(); gLog.clear();
@@ -14635,6 +14752,7 @@ int main(int,char**) {
                 }
                 // X = restart HTTP server
                 if (kDown&HidNpadButton_X) {
+                    if (gSaveRequestsStopped) { gShowBackPrompt = true; break; }
                     HttpServer::Stop();
                     HttpServer::Start(HTTP_PORT, SAVE_UGC_PATH);
                     LogOK("WebUI restarted");
@@ -14653,11 +14771,11 @@ int main(int,char**) {
                     gOnSwitchMode=OnSwitchMode::UGC; gOnSwitchMsg=""; break;
                 }
                 if (kDown&(HidNpadButton_B|HidNpadButton_Plus)){
-                    bool hasDirty = gPlayerSavDirty || gMiiSavDirty || gUgcDirty || gWebUiDirty;
+                    bool hasDirty = HasPendingSaveChanges();
                     bool toUserPick = (kDown&HidNpadButton_Plus) == 0;
                     if (hasDirty) {
                         gShowBackPrompt=true;
-                        gBackPromptIsMii=gMiiSavDirty; gBackPromptToUserPick=toUserPick;
+                        gBackPromptToUserPick=toUserPick;
                     } else if (toUserPick) {
                         FreePreview(); HttpServer::Stop(); gLog.clear();
                         gEntries.clear(); gMiis.clear();
@@ -14937,8 +15055,6 @@ int main(int,char**) {
                     // resume the apply flow once the snapshot is done
                     // instead of jumping straight to OnSwitch.
                     std::string uTag = SaveMount::SafeUserFolder(gUsers[u]);
-                    if (BackupService::CountBackups(uTag) >= gMaxBackups)
-                        BackupService::DeleteOldestBackup(uTag);
                     BackupService::StartFullBackup("tomodata:/", uTag);
                     gApplyBundleAfterBackup = true;
                     gApplyBundleUserIdx     = u;

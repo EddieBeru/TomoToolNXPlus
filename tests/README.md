@@ -16,3 +16,25 @@ They require no Switch libraries, SDL, filesystem access, or personal saves.
 These checks do not validate rendering, touch targets, physical controller input,
 config persistence, or game-save compatibility. Build the app with `make` and
 verify affected interface flows on a physical Switch separately.
+
+## Save safety
+
+```sh
+g++ -std=c++17 -Wall -Wextra -Werror -Wno-implicit-fallthrough \
+    -fno-exceptions -fno-rtti -Iinclude \
+    source/save_editor.cpp source/save_workflow.cpp source/backup_snapshot.cpp \
+    tests/save_safety_test.cpp \
+    -Wl,--wrap=fwrite,--wrap=fread,--wrap=fclose,--wrap=mkdir \
+    -o /tmp/tomotoolnx-save-safety-test
+/tmp/tomotoolnx-save-safety-test
+```
+
+Requires GNU ld wrappers and `/dev/full` on the host. Fixtures are synthetic and
+isolated in temporary directories. Add `-fsanitize=address,undefined
+-fno-omit-frame-pointer -g` for sanitizer checks.
+
+Covers all pending-file combinations, backup/preflight/write/commit failures,
+retry after partial success, serializer error reporting, unknown-field and version
+preservation, backup readback, incomplete snapshots, and destination collisions.
+Commit failures are injected callbacks; these tests do not model libnx journal
+behavior or validate the recovery UI. See [manual checks](../docs/SAVE_RECOVERY.md).

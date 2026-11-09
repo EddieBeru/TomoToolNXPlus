@@ -581,3 +581,15 @@ islandgen.run.dismiss_done = Listo
 islandgen.run.dismiss_cancel = Atrás
 islandgen.run.dismiss_error = OK
 islandgen.run.footer = B  cancelar (en curso)    A  continuar (al terminar)
+
+# Recuperación del guardado
+save.progress = Guardando cambios...
+save.error.title = Error al guardar
+save.error.retained = Tus cambios pendientes siguen en memoria. La aplicación seguirá abierta.
+save.error.partial = Algunos cambios podrían estar en disco. No se revirtieron automáticamente.
+save.error.paused = WebUI y la conexión USB están pausadas durante la recuperación.
+save.error.retry = Reintentar
+save.error.edit = Volver al editor
+save.error.footer = A  reintentar    B  volver al editor
+save.error.user = No se puede guardar: no hay un usuario válido seleccionado.
+save.error.backup = Falló la copia de seguridad. No se inició el guardado.

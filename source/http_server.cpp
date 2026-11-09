@@ -6,6 +6,7 @@
 #include "ugc_scanner.h"
 #include "texture_processor.h"
 #include "backup.h"
+#include <atomic>
 #include "mii_manager.h"
 #include "save_editor.h"
 #include "save_mount.h"
@@ -46,7 +47,7 @@ static void MkdirP(const char* path) { mkdir(path, 0777); }
 static bool FileExists(const std::string& p){struct stat st;return stat(p.c_str(),&st)==0;}
 
 static Thread      s_thread;
-static bool        s_running       = false;
+static std::atomic<bool> s_running{false};
 static bool        s_pendingCommit          = false;
 static bool        s_pendingMiiRefresh      = false;
 static bool        s_pendingPlayerSavReload = false;
@@ -83,7 +84,7 @@ static HttpServer::BgRemoveJob s_bgJob;
 static std::string             s_bgResult;
 static u64                   s_lastConnectTick = 0;
 
-static void SendAll(int fd,const char* data,size_t len){size_t sent=0;while(sent<len){ssize_t n=send(fd,data+sent,len-sent,0);if(n>0)sent+=n;else if(n<0&&errno==EAGAIN)svcSleepThread(1000000ULL);else break;}}
+static void SendAll(int fd,const char* data,size_t len){size_t sent=0;while(sent<len && s_running){ssize_t n=send(fd,data+sent,len-sent,0);if(n>0)sent+=n;else if(n<0&&errno==EAGAIN)svcSleepThread(1000000ULL);else break;}}
 static void SendStr(int fd,const std::string& s){SendAll(fd,s.c_str(),s.size());}
 static void Send200(int fd,const std::string& ct,const std::string& body){std::string h="HTTP/1.1 200 OK\r\nContent-Type: "+ct+"\r\nContent-Length: "+std::to_string(body.size())+"\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n";SendStr(fd,h);SendStr(fd,body);}
 static void Send200Bin(int fd,const std::string& ct,const std::vector<uint8_t>& body,const std::string& disp=""){std::string h="HTTP/1.1 200 OK\r\nContent-Type: "+ct+"\r\nContent-Length: "+std::to_string(body.size())+"\r\nAccess-Control-Allow-Origin: *\r\n";if(!disp.empty())h+="Content-Disposition: "+disp+"\r\n";h+="Connection: close\r\n\r\n";SendStr(fd,h);SendAll(fd,(const char*)body.data(),body.size());}
@@ -98,7 +99,8 @@ static std::string GetQueryParam(const std::string& q,const std::string& key){st
 
 static bool ReadRequest(int fd,Request& req){
     std::string raw;char buf[4096];
-    while(true){ssize_t n=recv(fd,buf,sizeof(buf)-1,0);if(n<=0)return false;raw.append(buf,n);if(raw.find("\r\n\r\n")!=std::string::npos)break;if(raw.size()>65536)return false;}
+    while(s_running){ssize_t n=recv(fd,buf,sizeof(buf)-1,0);if(n<=0)return false;raw.append(buf,n);if(raw.find("\r\n\r\n")!=std::string::npos)break;if(raw.size()>65536)return false;}
+    if (!s_running) return false;
     size_t hdrEnd=raw.find("\r\n\r\n");std::string headers=raw.substr(0,hdrEnd);req.body=raw.substr(hdrEnd+4);
     size_t sp1=headers.find(' '),sp2=headers.find(' ',sp1+1);if(sp1==std::string::npos||sp2==std::string::npos)return false;
     req.method=headers.substr(0,sp1);std::string pf=headers.substr(sp1+1,sp2-sp1-1);size_t qp=pf.find('?');
@@ -106,8 +108,8 @@ static bool ReadRequest(int fd,Request& req){
     auto findHdr=[&](const std::string& name){std::string lo=name;for(auto& c:lo)c=tolower(c);size_t pos=0;while((pos=headers.find('\n',pos))!=std::string::npos){pos++;std::string line=headers.substr(pos,headers.find('\n',pos)-pos);std::string ll=line;for(auto& c:ll)c=tolower(c);if(ll.find(lo+":")!=0)continue;size_t vp=line.find(':')+1;while(vp<line.size()&&line[vp]==' ')vp++;std::string val=line.substr(vp);while(!val.empty()&&(val.back()=='\r'||val.back()=='\n'))val.pop_back();return val;}return std::string{};};
     std::string cl=findHdr("content-length");if(!cl.empty())req.contentLength=(size_t)atoll(cl.c_str());
     req.contentType=findHdr("content-type");
-    while(req.body.size()<req.contentLength){ssize_t n=recv(fd,buf,std::min(sizeof(buf)-1,req.contentLength-req.body.size()),0);if(n<=0)break;req.body.append(buf,n);}
-    return true;
+    while(req.body.size()<req.contentLength && s_running){ssize_t n=recv(fd,buf,std::min(sizeof(buf)-1,req.contentLength-req.body.size()),0);if(n<=0)break;req.body.append(buf,n);}
+    return s_running && req.body.size() >= req.contentLength;
 }
 
 struct FormField{std::string name,filename,data;};
@@ -217,7 +219,7 @@ static void HandleImport(int fd,const Request& req){
     {mutexLock(&s_importMutex);s_importJob={opts,tmpPath};s_importState=ImportState::Queued;s_importResult="";mutexUnlock(&s_importMutex);}
 
     bool timedOut=true;
-    for(int i=0;i<30000;i++){
+    for(int i=0;i<30000 && s_running;i++){
         svcSleepThread(1000000ULL);
         mutexLock(&s_importMutex);bool done=(s_importState==ImportState::Done);mutexUnlock(&s_importMutex);
         if(done){timedOut=false;break;}
@@ -246,7 +248,7 @@ static void HandleBgRemove(int fd,const Request& req){
     {mutexLock(&s_bgMutex);s_bgJob={found->ugctexPath,opts};s_bgState=ImportState::Queued;s_bgResult="";mutexUnlock(&s_bgMutex);}
     SrvLog("BgRemove: job queued for main thread");
     bool timedOut=true;
-    for(int i=0;i<120000;i++){
+    for(int i=0;i<120000 && s_running;i++){
         svcSleepThread(1000000ULL);
         mutexLock(&s_bgMutex);bool done=(s_bgState==ImportState::Done);mutexUnlock(&s_bgMutex);
         if(done){timedOut=false;break;}

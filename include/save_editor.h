@@ -47,7 +47,8 @@ struct SavFile {
 // Load a .sav from disk. Returns true on success; sets err on failure.
 bool Load(const std::string& path, SavFile& out, std::string& err);
 
-// Write a .sav to disk. Returns empty string on success, error otherwise.
+std::string ValidateForWrite(const SavFile& sav);
+// Empty string on success; filesystem commit is the caller's responsibility.
 std::string Save(const std::string& path, const SavFile& sav);
 
 // Murmur3 x86 32-bit hash (seed 0) — matches the game's field name hashing.

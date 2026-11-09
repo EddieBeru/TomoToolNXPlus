@@ -6,6 +6,7 @@
 #include <cstring>
 #include <cstdio>
 #include <algorithm>
+#include <limits>
 
 namespace SaveEditor {
 
@@ -79,8 +80,8 @@ static std::vector<uint8_t> ReadHeap(const std::vector<uint8_t>& b, uint32_t off
         return std::vector<uint8_t>(b.begin()+off, b.begin()+off+fixed);
     }
 
-    if (off + 4 > b.size()) return {};
-    uint32_t count = R32(b.data() + off);
+    if (off > b.size() || b.size() - off < 4) return {};
+    uint64_t count = R32(b.data() + off);
     size_t total = 0;
 
     switch (t) {
@@ -107,7 +108,7 @@ static std::vector<uint8_t> ReadHeap(const std::vector<uint8_t>& b, uint32_t off
             for (uint32_t i = 0; i < count; i++) {
                 if (p + 4 > b.size()) return {};
                 uint32_t sz = R32(b.data() + p);
-                p += 4 + sz;
+                p += 4 + static_cast<size_t>(sz);
                 if (p > b.size()) return {};
             }
             return std::vector<uint8_t>(b.begin()+off, b.begin()+p);
@@ -158,7 +159,32 @@ bool Load(const std::string& path, SavFile& out, std::string& err) {
 }
 
 // ── Save ──────────────────────────────────────────────────────────────────────
+std::string ValidateForWrite(const SavFile& sav) {
+    if (!sav.loaded) return "Save is not loaded";
+    const uint64_t indexSize = 0x20ull + (static_cast<uint64_t>(DT_COUNT) + sav.entries.size()) * 8;
+    uint64_t totalSize = indexSize;
+    for (const auto& entry : sav.entries) {
+        if (static_cast<uint32_t>(entry.type) >= static_cast<uint32_t>(DT_COUNT))
+            return "Unsupported field type";
+        if (entry.hash == 0) return "Invalid field hash";
+        if (IsInline(entry.type)) continue;
+        const size_t fixedSize = FixedSize(entry.type);
+        if (fixedSize && entry.payload.size() != fixedSize) return "Invalid fixed-size field";
+        if (entry.type != DT_Bool64Key && entry.payload.empty()) return "Missing field payload";
+        if (entry.type == DT_Bool64Key && !entry.payload.empty()) return "Unsupported key payload";
+        if (!fixedSize && entry.type != DT_Bool64Key &&
+            ReadHeap(entry.payload, 0, entry.type).size() != entry.payload.size())
+            return "Invalid field payload length";
+        totalSize += entry.payload.size();
+        if (totalSize > std::numeric_limits<uint32_t>::max()) return "Save exceeds format size limit";
+    }
+    if (totalSize > std::numeric_limits<uint32_t>::max()) return "Save exceeds format size limit";
+    return "";
+}
+
 std::string Save(const std::string& path, const SavFile& sav) {
+    const std::string validationError = ValidateForWrite(sav);
+    if (!validationError.empty()) return validationError;
     // Group entry indices by DataType
     std::vector<std::vector<size_t>> byType((size_t)DT_COUNT);
     for (size_t i = 0; i < sav.entries.size(); i++) {
@@ -216,8 +242,11 @@ std::string Save(const std::string& path, const SavFile& sav) {
 
     FILE* f = fopen(path.c_str(), "wb");
     if (!f) return "Cannot open for write: " + path;
-    fwrite(out.data(), 1, out.size(), f);
-    fclose(f);
+    const size_t written = fwrite(out.data(), 1, out.size(), f);
+    const bool writeError = ferror(f) != 0;
+    const int closeResult = fclose(f);
+    if (written != out.size() || writeError) return "Short write: " + path;
+    if (closeResult != 0) return "Cannot close after write: " + path;
     return "";
 }
 

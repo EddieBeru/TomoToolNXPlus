@@ -33,6 +33,7 @@ void Cleanup();
 
 // Error string from the backup thread, empty on success.
 std::string BackupError();
+std::string CompletedBackupPath();
 
 // ── Backup folder management ──────────────────────────────────────────────────
 

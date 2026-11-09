@@ -1,5 +1,6 @@
 // backup.cpp – no std::filesystem (-fno-exceptions incompatible)
 #include "backup.h"
+#include "backup_snapshot.h"
 #include <string>
 #include <vector>
 #include <algorithm>
@@ -92,6 +93,15 @@ static std::vector<std::string> ListSaveBackups(const std::string& uidTag) {
         std::string full = root + "/" + de->d_name;
         struct stat st;
         if (stat(full.c_str(), &st) != 0 || !S_ISDIR(st.st_mode)) continue;
+        if (FileExists(full + "/" + BackupSnapshot::IncompleteMarker)) continue;
+        bool completeFiles = true;
+        for (const char* name : {"Mii.sav", "Player.sav", "Map.sav"}) {
+            if (stat((full + "/" + name).c_str(), &st) != 0 || !S_ISREG(st.st_mode) || st.st_size < 0x20) {
+                completeFiles = false;
+                break;
+            }
+        }
+        if (!completeFiles) continue;
         int dd, mo, yy, hh, mm, ss = 0;
         uint64_t key = 0;
         // Accept both the new "..._HH-MM-SS" names and legacy "..._HH-MM"
@@ -212,44 +222,6 @@ static std::string s_error;
 static std::string s_saveRoot;
 static std::string s_backupDest;
 
-// Recursive copy — copies src tree into dst (dst must already exist).
-// First CopyFile error is recorded into s_error; subsequent files still
-// attempt to copy so the backup is as complete as possible.
-static void CopyTree(const std::string& src, const std::string& dst,
-                     int& done, int total) {
-    DIR* d = opendir(src.c_str());
-    if (!d) return;
-    struct dirent* de;
-    while ((de = readdir(d)) != nullptr) {
-        if (!strcmp(de->d_name,".") || !strcmp(de->d_name,"..")) continue;
-        // Plain concat — `src`/`dst` for backups are SD-card paths that
-        // don't end in '/', so adding "/" is safe. For savedata-mount
-        // destinations see RestoreCopyTree's JoinPath helper.
-        std::string srcChild = src + "/" + de->d_name;
-        std::string dstChild = dst + "/" + de->d_name;
-        struct stat st;
-        if (stat(srcChild.c_str(), &st) != 0) continue;
-        if (S_ISDIR(st.st_mode)) {
-            MkdirP(dstChild);
-            CopyTree(srcChild, dstChild, done, total);
-        } else {
-            std::string cerr = CopyFile(srcChild, dstChild);
-            if (!cerr.empty()) {
-                mutexLock(&s_mutex);
-                if (s_error.empty()) s_error = cerr;
-                mutexUnlock(&s_mutex);
-            }
-            done++;
-            if (total > 0) {
-                mutexLock(&s_mutex);
-                s_progress = (float)done / total;
-                mutexUnlock(&s_mutex);
-            }
-        }
-    }
-    closedir(d);
-}
-
 static std::string s_backupParent;
 
 static void BackupThreadFunc(void*) {
@@ -259,17 +231,19 @@ static void BackupThreadFunc(void*) {
     MkdirP(BACKUP_ROOT);
     if (!s_backupParent.empty() && s_backupParent != BACKUP_ROOT)
         MkdirP(s_backupParent);
-    MkdirP(dest);
-
     int total = CountFiles(root);
-    int done  = 0;
-
-    CopyTree(root, dest, done, total);
+    int done = 0;
+    const std::string error = BackupSnapshot::Create(root, dest, [&]() {
+        ++done;
+        mutexLock(&s_mutex);
+        s_progress = total > 0 ? std::min(0.99f, static_cast<float>(done) / total) : 0.0f;
+        mutexUnlock(&s_mutex);
+    });
 
     mutexLock(&s_mutex);
-    s_progress = 1.0f;
-    s_done     = true;
-    s_error    = "";
+    if (error.empty()) s_progress = 1.0f;
+    s_error = error;
+    s_done = true;
     mutexUnlock(&s_mutex);
 }
 
@@ -277,16 +251,28 @@ namespace BackupService {
 
 void StartFullBackup(const std::string& saveMountRoot,
                      const std::string& uidTag) {
+    Cleanup();
     mutexInit(&s_mutex);
     s_progress     = 0.0f;
     s_done         = false;
     s_error        = "";
     s_saveRoot     = saveMountRoot;
     s_backupParent = BackupRootFor(uidTag);
-    s_backupDest   = MakeTimestampedBackupPath(uidTag);
-    threadCreate(&s_thread, BackupThreadFunc, nullptr, nullptr, 256*1024, 0x2C, -2);
-    threadStart(&s_thread);
-    s_threadActive = true;
+    const std::string base = MakeTimestampedBackupPath(uidTag);
+    s_backupDest = base;
+    struct stat st{};
+    for (unsigned suffix = 1; stat(s_backupDest.c_str(), &st) == 0; ++suffix)
+        s_backupDest = base + "_" + std::to_string(suffix);
+    Result rc = threadCreate(&s_thread, BackupThreadFunc, nullptr, nullptr, 256*1024, 0x2C, -2);
+    if (R_SUCCEEDED(rc)) {
+        rc = threadStart(&s_thread);
+        if (R_SUCCEEDED(rc)) { s_threadActive = true; return; }
+        threadClose(&s_thread);
+    }
+    char error[80];
+    snprintf(error, sizeof(error), "Cannot start backup: 0x%08X", rc);
+    s_error = error;
+    s_done = true;
 }
 
 void Cleanup() {
@@ -315,6 +301,13 @@ std::string BackupError() {
     std::string v = s_error;
     mutexUnlock(&s_mutex);
     return v;
+}
+
+std::string CompletedBackupPath() {
+    mutexLock(&s_mutex);
+    const std::string path = s_done && s_error.empty() ? s_backupDest : std::string();
+    mutexUnlock(&s_mutex);
+    return path;
 }
 
 bool HasExistingBackup(const std::string& uidTag) {
@@ -356,16 +349,16 @@ static std::string JoinPath(const std::string& a, const std::string& b) {
     return a + "/" + b;
 }
 
-// `commitDev` (e.g. "tomodata") is forwarded into CopyFile so writes into a
-// savedata mount drain the journal mid-file. Pass nullptr for plain SD->SD
-// or savedata->SD copies (e.g. restoring a backup to a non-savedata path).
+// Savedata commits happen after each file closes.
 static std::string RestoreCopyTree(const std::string& src, const std::string& dst,
-                                   const char* commitDev = nullptr) {
+                                   const char* commitDev = nullptr, bool skipMetadata = false) {
     DIR* d = opendir(src.c_str());
     if (!d) return "Cannot read: " + src;
     struct dirent* de;
     while ((de = readdir(d)) != nullptr) {
         if (!strcmp(de->d_name,".") || !strcmp(de->d_name,"..")) continue;
+        if (skipMetadata && (!strcmp(de->d_name, BackupSnapshot::CompleteMarker) ||
+                             !strcmp(de->d_name, BackupSnapshot::IncompleteMarker))) continue;
         std::string sc = JoinPath(src, de->d_name);
         std::string dc = JoinPath(dst, de->d_name);
         struct stat st;
@@ -391,11 +384,12 @@ std::vector<std::string> ListBackups(const std::string& uidTag) {
 
 std::string RestoreBackup(const std::string& backupPath, const std::string& saveMountRoot) {
     if (!DirExists(backupPath)) return "Backup folder not found";
-    // saveMountRoot is always "tomodata:/" in practice — the savedata mount
-    // shared with SaveMount::SAVE_MOUNT_NAME. Forwarding the device name
-    // lets CopyFile drain the journal mid-file so large savs don't
-    // short-write into Tomodachi's 1 MiB journal cap.
-    return RestoreCopyTree(backupPath, saveMountRoot, "tomodata");
+    if (FileExists(backupPath + "/" + BackupSnapshot::IncompleteMarker)) return "Backup is incomplete";
+    if (FileExists(backupPath + "/" + BackupSnapshot::CompleteMarker)) {
+        const std::string error = BackupSnapshot::Validate(backupPath);
+        if (!error.empty()) return error;
+    }
+    return RestoreCopyTree(backupPath, saveMountRoot, "tomodata", true);
 }
 
 // ── Save bundles ────────────────────────────────────────────────────────────

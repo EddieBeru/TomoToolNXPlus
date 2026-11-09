@@ -628,3 +628,15 @@ mii.footer.browse = Up/Down  mii    Left/Right  page    ZL/ZR  mii  (target slot
 mii.footer.browse.detail = ZL/ZR  mii  (target slot)    A  download & overwrite    B  back to list
 mii.footer.stats.name = ZL/ZR  mii    Up/Down  field    Left/Right  select    A  confirm    X  pronunciation    Y  subtab    L/R  tab    B/+  back
 mii.footer.stats.value = ZL/ZR  mii    Up/Down  field    Left/Right  value    X  undo    Y  subtab    L/R  tab    B/+  back
+
+# Save recovery
+save.progress = Saving changes...
+save.error.title = Save failed
+save.error.retained = Your pending edits are still in memory. The app will stay open.
+save.error.partial = Some changes may already be on disk. No automatic rollback was performed.
+save.error.paused = WebUI and USB sharing are paused during recovery.
+save.error.retry = Retry save
+save.error.edit = Back to editor
+save.error.footer = A  retry save    B  back to editor
+save.error.user = Cannot save: no valid user is selected.
+save.error.backup = Backup failed. No save operation was started.
