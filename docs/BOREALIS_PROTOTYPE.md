@@ -26,7 +26,8 @@ Borealis is vendored at `5f08b286f3df737f3321d2247a6fe633fcead03c` from
 https://github.com/xfangfang/borealis. See `libs/borealis/VENDOR.md`, `LICENSE`,
 `NOTICE`, `AUTHORS` and the bundled dependency notices. License texts are also
 included in the prototype ROMFS under `legal/`; the Material Icons license is
-under `material/`. Library sources are unchanged. SDL2 comes from devkitPro.
+under `material/`. The single SDL context-selection patch is documented in `VENDOR.md`. SDL2
+comes from devkitPro.
 
 The pilot uses SDL2/OpenGL ES 2. Borealis owns its window, graphics context,
 input and event loop. RTTI and exceptions are enabled only in this separate
