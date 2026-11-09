@@ -130,7 +130,7 @@ of people a long time to understand.
 | [alexislours/ltd-save-editor](https://github.com/alexislours/ltd-save-editor) | the save parser, the generated data tables (wishes, habits, clothes, coordinates, treasures), the `Map.sav` schema hashes, the UGC kind table, the housing edit safety rules and the BC1/BC3 encoder. AGPL-3.0-or-later |
 | [tlmodding/ltd-gamedata](https://github.com/tlmodding/ltd-gamedata) | early reference for the save key hashes |
 | [ITotalJustice/libhaze](https://github.com/ITotalJustice/libhaze) | MTP over USB |
-| [Switch Button Icons and Controls](https://zacksly.itch.io/switch-button-icons-and-controls) | by Zacksly, CC BY 3.0. Candidate source for future controller prompts; no icons from the pack are bundled yet. |
+| [Switch Button Icons and Controls](https://zacksly.itch.io/switch-button-icons-and-controls) | Button prompt icons in `romfs/ui/controller/`, by Zacksly, CC BY 3.0. The bundled PNGs are unmodified. |
 
 ---
 
