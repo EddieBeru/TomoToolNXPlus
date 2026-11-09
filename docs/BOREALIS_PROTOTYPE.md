@@ -85,3 +85,69 @@ A successful host cross-build establishes that an NRO can be produced, not
 hardware usability or game-save compatibility. This pilot contains no save
 workflow and cannot establish save compatibility. Physical Switch testing is
 required before a production migration.
+
+## Verification record (2026-11-08)
+
+Host: devkitPro/libnx cross-build on Linux (GCC 16.1.0, CMake 3.30.5). Both `make -j4` and
+`make -j4 borealis-prototype` succeeded. The existing ELF was also repackaged
+through the default Makefile with
+`make -j4 --assume-new="$PWD/TomoToolNX.elf"`, producing `TomoToolNX.nro`.
+The default goal remains `all`. Production RTTI/exceptions flags remain
+`-fno-rtti -fno-exceptions`; the pilot uses `-frtti -fexceptions`.
+
+The pilot's link command contains only its main, sample and upstream Switch
+lifecycle wrapper objects plus Borealis/platform libraries. Symbol inspection
+found no production SaveMount, SaveEditor, SaveWorkflow, Config or HTTP classes.
+All locale JSON parses successfully, and pilot key sets match in all three
+locales. The vendored source matches the pinned Git tree except for the
+explicit SDL context-selection patch; no source files from the snapshot are
+missing, apart from the unused SDL/GLFW gitlinks.
+
+**Emulator limitation:** Ryujinx Canary 1.3.338 fails on the unmodified NRO
+before displaying the UI: `Unknown MRS 0xD53B2521` (`GCSPR_EL0`) inside
+libgcc's exception unwinder. This is not a successful test of the deliverable
+NRO in that emulator. Neither the installed toolchain nor emulator was upgraded.
+
+For UI checks only, a temporary copy of the pilot ELF/NRO under `/tmp` was
+adapted to skip the libgcc guarded-control-stack paths: five `CBNZ x16`
+instructions following `MOV x16,#1; CHKFEAT x16` were replaced with unconditional
+branches to their existing targets. No application instructions were changed.
+This workaround is absent from the source, Make/CMake targets and deliverable
+`TomoToolNXBorealis.nro`. It limits the runtime evidence to that adapted copy;
+it does not validate the deliverable's unwinder or hardware behavior.
+
+With that copy, using an isolated portable emulator profile, synthetic data,
+keyboard-mapped controller input and mouse-generated touchscreen input:
+
+| Check | Result |
+| --- | --- |
+| All five destinations; ZL/ZR forward/back and end wrapping | Passed |
+| D-pad and left-stick focus movement, A activation | Passed |
+| Held direction repeats focus; held ZR changes only one tab | Passed |
+| Settings child and B return to its entry row | Passed |
+| Return to tab restores previous content focus | Passed |
+| Boolean and selector controls; values survive reopening the child | Passed |
+| B closes selector/dialog; ZL/ZR does not switch tabs behind a child | Passed |
+| Touch selects tabs, opens settings, edits controls and returns using Back | Passed |
+| Focusable Exit pilot returns from the homebrew session | Passed |
+| English and Latin American Spanish; visible focus; light theme at 720p | Passed |
+
+The longer Spanish hints initially truncated the footer and wrapped the clock;
+shorter localized hint labels fixed that layout. The longer descriptions wrap,
+and the native scrolling frame keeps focused texture rows visible. The demo
+empty slot is explicitly labeled Empty; no real asynchronous/loading/save-error
+states exist in this sample.
+
+The system's light theme was observed. Dark-theme appearance, automatic theme
+selection on real hardware, physical Joy-Con/touch usability, docked scaling
+and the unmodified NRO's runtime remain unverified on a physical Switch.
+Plus/Minus/X/Y have no registered pilot actions (source review). No save-format
+or save-write compatibility claim follows from any of these checks.
+
+The emulator's system-font rendering shows uneven spacing around some accented
+glyphs (for example Sí and Vacío). Shared-font rendering needs inspection on
+hardware before adopting the framework.
+
+Native 1280 × 720 captures from the adapted emulator copy:
+[Textures](images/borealis-prototype/textures-es.png) and
+[Texture Settings](images/borealis-prototype/settings-es.png).
