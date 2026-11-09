@@ -31,6 +31,9 @@ bool IsEnabled(const State& state, Row row);
 int ValueCount(Row row);
 // Custom matte colors have no preset index (-1).
 int ValueIndex(const State& state, Row row);
+bool ValidPreferences(const State& state);
+// Select a validated value without imposing a renderer's focus/input model.
+bool SelectValue(State& state, Row row, int value);
 
 // Repair disabled focus: prefer the next enabled row, then the previous.
 void NormalizeFocus(State& state);

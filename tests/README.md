@@ -38,3 +38,23 @@ retry after partial success, serializer error reporting, unknown-field and versi
 preservation, backup readback, incomplete snapshots, and destination collisions.
 Commit failures are injected callbacks; these tests do not model libnx journal
 behavior or validate the recovery UI. See [manual checks](../docs/SAVE_RECOVERY.md).
+
+## Texture preference configuration
+
+```sh
+g++ -std=c++17 -Wall -Wextra -Werror -fno-exceptions -fno-rtti -Iinclude \
+    source/focus_navigation.cpp source/texture_settings.cpp \
+    source/texture_settings_config.cpp source/texture_settings_store.cpp \
+    tests/texture_settings_config_test.cpp \
+    -Wl,--wrap=open,--wrap=read,--wrap=write,--wrap=close,--wrap=fsync \
+    -o /tmp/tomotool-config-test
+/tmp/tomotool-config-test
+```
+
+Uses synthetic temporary configs. Checks preservation of comments, unknown keys,
+legacy theme/color keys, line endings, inactive preferences and custom matte
+colors; invalid tokens, duplicates, bounds and external edits; verified backups,
+exclusive creation, short writes, read/write/flush/close/verification failures
+and reopen persistence. This models POSIX file failures on the host, not SD card
+power loss or libnx behavior. The backup remains available after partial writes;
+retry is blocked until configuration is reloaded.

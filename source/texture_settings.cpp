@@ -70,6 +70,24 @@ int ValueIndex(const State& state, Row row) {
     return IsValid(row) ? kRows[static_cast<int>(row)].valueIndex(state) : -1;
 }
 
+bool ValidPreferences(const State& state) {
+    for (int i = 0; i < RowCount - 1; ++i) {
+        const auto row = static_cast<Row>(i);
+        const int value = ValueIndex(state, row);
+        if (value < 0 || value >= ValueCount(row)) return false;
+    }
+    return state.matte.a == 0 || state.matte.a == 255;
+}
+
+bool SelectValue(State& state, Row row, int value) {
+    if (!ValidPreferences(state) || !IsEnabled(state, row) ||
+        value < 0 || value >= ValueCount(row)) return false;
+    const State before = state;
+    kRows[static_cast<int>(row)].setValue(state, value);
+    NormalizeFocus(state);
+    return !SamePreferences(before, state);
+}
+
 Row FocusedRow(const State& state) {
     return static_cast<Row>(state.navigation.Root());
 }
@@ -135,11 +153,9 @@ Outcome Apply(State& state, FocusNavigation::Command command) {
     } else if (command == Command::Activate) {
         if (!IsEditing(state)) { EnterRow(state, row); return result; }
         state.input.Consume();
-        const State before = state;
-        kRows[static_cast<int>(row)].setValue(state, FocusedOption(state));
+        result.preferencesChanged = SelectValue(state, row, FocusedOption(state));
         state.navigation.Back();
         NormalizeFocus(state);
-        result.preferencesChanged = !SamePreferences(before, state);
     } else if (!IsEditing(state) && (command == Command::Up || command == Command::Down)) {
         state.input.Consume();
         const int next = FocusNavigation::NextIndex(static_cast<int>(row),
