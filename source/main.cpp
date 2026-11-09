@@ -31,6 +31,7 @@
 #include "island_generator.h"
 #include "island_generator_runner.h"
 #include "ui_icons.h"
+#include "controller_prompts.h"
 #include <string>
 #include <vector>
 #include <dirent.h>
@@ -5648,6 +5649,49 @@ static void DrawFileBrowser() {
 }
 
 // ─── Texture encoding settings tab ───────────────────────────────────────────
+static void DrawTextureSettingsActionPrompt(ControllerPrompts::Icon icon,
+                                            const char* fallback,
+                                            const std::string& label,
+                                            int cx, int cy, SDL_Color color) {
+    int labelW = 0, labelH = 0;
+    if (TTF_Font* font = GetFont(Font::Sm))
+        TTF_SizeUTF8(font, label.c_str(), &labelW, &labelH);
+    const int iconSize = 22;
+    const int gap = 8;
+    const int promptW = (ControllerPrompts::Available(icon) ? iconSize : 0)
+                      + (ControllerPrompts::Available(icon) ? gap : 0) + labelW;
+    const int left = cx - promptW / 2;
+    if (ControllerPrompts::Available(icon)) {
+        ControllerPrompts::Draw(icon, left + iconSize / 2, cy, iconSize, color);
+        DrawTextVC(label, left + iconSize + gap, cy, color);
+    } else {
+        std::string text = std::string(fallback) + "  " + label;
+        DrawTextC(text, cx, cy, color);
+    }
+}
+
+static void DrawTextureSettingsFooter(bool editing) {
+    FillRect(0, SCREEN_H - 30, SCREEN_W, 30, COL_PANEL);
+    DrawRect(0, SCREEN_H - 30, SCREEN_W, 1, COL_BORDER);
+    const std::string label = Lang::T(editing ? "settings.nav.options" : "settings.nav.rows");
+    if (!ControllerPrompts::Available(ControllerPrompts::Icon::Dpad)
+        || !ControllerPrompts::Available(ControllerPrompts::Icon::LeftStick)) {
+        DrawTextC(label, SCREEN_W / 2, SCREEN_H - 15, COL_DIM);
+        return;
+    }
+    int labelW = 0, labelH = 0;
+    if (TTF_Font* font = GetFont(Font::Sm))
+        TTF_SizeUTF8(font, label.c_str(), &labelW, &labelH);
+    const int iconSize = 20, iconGap = 5, textGap = 10;
+    const int totalW = iconSize * 2 + iconGap + textGap + labelW;
+    int x = (SCREEN_W - totalW) / 2;
+    const int cy = SCREEN_H - 15;
+    ControllerPrompts::Draw(ControllerPrompts::Icon::Dpad, x + iconSize / 2, cy, iconSize, COL_DIM);
+    x += iconSize + iconGap;
+    ControllerPrompts::Draw(ControllerPrompts::Icon::LeftStick, x + iconSize / 2, cy, iconSize, COL_DIM);
+    DrawTextVC(label, x + iconSize + textGap, cy, COL_DIM);
+}
+
 static void DrawTexSettings() {
     using Row = TextureSettings::Row;
     const bool editing = TextureSettings::IsEditing(gTextureSettings);
@@ -5817,18 +5861,20 @@ static void DrawTexSettings() {
         const int confirmX = SCREEN_W/2 - buttonW - 12;
         FillRect(confirmX, buttonY, buttonW, buttonH, COL_PANEL);
         DrawRect(confirmX, buttonY, buttonW, buttonH, COL_ACCENT);
-        DrawTextC("A  " + Lang::T("settings.nav.apply"), confirmX + buttonW/2, buttonY + buttonH/2, COL_TEXT);
+        DrawTextureSettingsActionPrompt(ControllerPrompts::Icon::A, "A",
+            Lang::T("settings.nav.apply"), confirmX + buttonW/2, buttonY + buttonH/2, COL_TEXT);
         HitAdd(confirmX, buttonY, buttonW, buttonH, TConfirmTextureSettings, 0);
     }
     const int backX = editing ? SCREEN_W/2 + 12 : SCREEN_W/2 - buttonW/2;
     FillRect(backX, buttonY, buttonW, buttonH, COL_PANEL);
     DrawRect(backX, buttonY, buttonW, buttonH, COL_BORDER);
-    DrawTextC("B  " + Lang::T(editing ? "backprompt.cancel" : "settings.nav.back"),
-              backX + buttonW/2, buttonY + buttonH/2, COL_TEXT);
+    DrawTextureSettingsActionPrompt(ControllerPrompts::Icon::B, "B",
+        Lang::T(editing ? "backprompt.cancel" : "settings.nav.back"),
+        backX + buttonW/2, buttonY + buttonH/2, COL_TEXT);
     HitAdd(backX, buttonY, buttonW, buttonH, TBackTextureSettings, 0);
     DrawTextC(Lang::T(editing ? "settings.nav.pending" : "settings.nav.browse"),
               SCREEN_W/2, 570, COL_DIM, Font::Sm);
-    DrawFooter(Lang::T(editing ? "settings.nav.options" : "settings.nav.rows"));
+    DrawTextureSettingsFooter(editing);
     Present();
 }
 
@@ -12353,6 +12399,7 @@ int main(int,char**) {
     gRen=SDL_CreateRenderer(win,-1,SDL_RENDERER_ACCELERATED|SDL_RENDERER_PRESENTVSYNC);
     SDL_SetRenderDrawBlendMode(gRen,SDL_BLENDMODE_BLEND);
     UiIcons::Init(gRen);
+    ControllerPrompts::Init(gRen);
     FontInit();
     Audio::Init();
 
@@ -15280,6 +15327,7 @@ int main(int,char**) {
     for (auto tex : gAvatarTextures) if (tex) SDL_DestroyTexture(tex);
     gAvatarTextures.clear();
     Audio::Quit();
+    ControllerPrompts::Quit();
     UiIcons::Quit();
     FontQuit();
     nifmExit();

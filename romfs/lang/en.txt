@@ -645,5 +645,5 @@ settings.nav.apply = Apply
 settings.nav.back = Back to textures
 settings.nav.pending = Choose an option, then apply or cancel.
 settings.nav.browse = Choose a setting to edit.
-settings.nav.options = Left/Right  choose    A  apply    B  cancel
-settings.nav.rows = Up/Down  focus    A  open options    B  back
+settings.nav.options = Choose option
+settings.nav.rows = Move focus

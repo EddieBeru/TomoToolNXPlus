@@ -10,6 +10,7 @@ remain unchanged until confirmation; only confirmed changes persist config.
 - Tap a row or option to enter editing; Apply/Cancel have touch buttons.
 - The row/option outline and arrow indicate focus. Filled options with a check
   mark indicate committed values. Custom matte colors select no preset.
+- A/B prompts and the navigation footer use the bundled controller icons.
 - Editing blocks other rows, tab touches, and legacy L/R/Plus actions. One frame
   cannot both enter and confirm, including combined touch/controller input.
 
