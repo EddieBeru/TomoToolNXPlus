@@ -16,6 +16,7 @@
 #include <cstdint>
 
 namespace TextureProcessor {
+bool DetectUgctexLayoutInner(size_t bytes, UgctexLayout& layout, std::string& errOut);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // sRGB LUTs
@@ -42,23 +43,9 @@ static void BuildLuts() {
     s_lutsBuilt = true;
 }
 
-void ConvertSrgbToLinear(std::vector<uint8_t>& rgba) {
-    BuildLuts();
-    for (size_t i = 0; i < rgba.size(); i += 4) {
-        rgba[i]   = s_srgbToLinear[rgba[i]];
-        rgba[i+1] = s_srgbToLinear[rgba[i+1]];
-        rgba[i+2] = s_srgbToLinear[rgba[i+2]];
-    }
-}
 
-void ConvertLinearToSrgb(std::vector<uint8_t>& rgba) {
-    BuildLuts();
-    for (size_t i = 0; i < rgba.size(); i += 4) {
-        rgba[i]   = s_linearToSrgb[rgba[i]];
-        rgba[i+1] = s_linearToSrgb[rgba[i+1]];
-        rgba[i+2] = s_linearToSrgb[rgba[i+2]];
-    }
-}
+
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Filename helpers
@@ -99,23 +86,9 @@ std::string GetBaseName(const std::string& filename) {
 }
 
 // Returns true and fills layout, or returns false with errOut set
-static bool DetectUgctexLayoutInner(size_t bytes, UgctexLayout& layout, std::string& errOut) {
-    switch (bytes) {
-        case 131072: layout = {512, 512, 128, 128, 16, TextureFormat::Bc1}; return true;
-        case  98304: layout = {384, 384,  96, 128, 16, TextureFormat::Bc1}; return true;
-        case  65536: layout = {256, 256,  64,  64,  8, TextureFormat::Bc3}; return true;
-        default:
-            errOut = "Unknown ugctex size: " + std::to_string(bytes) + " bytes";
-            return false;
-    }
-}
 
-UgctexLayout DetectUgctexLayout(size_t bytes) {
-    UgctexLayout layout{};
-    std::string err;
-    DetectUgctexLayoutInner(bytes, layout, err);
-    return layout;
-}
+
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Zstd I/O  (no exceptions – return error via bool/string)
@@ -206,31 +179,7 @@ static int GobAddress(int x, int y, int widthInGobs, int bpe, int blockHeight) {
         + (xInGob % 16);
 }
 
-std::vector<uint8_t> DeswizzleBlockLinear(const std::vector<uint8_t>& data,
-                                           int width, int height,
-                                           int bpe, int blockHeight) {
-    int widthInGobs  = DivRoundUp(width * bpe, 64);
-    int paddedHeight = DivRoundUp(height, 8 * blockHeight) * (8 * blockHeight);
-    size_t paddedSize = (size_t)widthInGobs * paddedHeight * 64;
 
-    const uint8_t* src = data.data();
-    std::vector<uint8_t> padded;
-    if (data.size() < paddedSize) {
-        padded.resize(paddedSize, 0);
-        memcpy(padded.data(), data.data(), data.size());
-        src = padded.data();
-    }
-
-    std::vector<uint8_t> output((size_t)width * height * bpe);
-    for (int y = 0; y < height; y++) {
-        for (int x = 0; x < width; x++) {
-            int sw  = GobAddress(x, y, widthInGobs, bpe, blockHeight);
-            int lin = (y * width + x) * bpe;
-            memcpy(output.data() + lin, src + sw, bpe);
-        }
-    }
-    return output;
-}
 
 std::vector<uint8_t> SwizzleBlockLinear(const std::vector<uint8_t>& data,
                                          int width, int height,
@@ -285,36 +234,7 @@ static int ColorDistSq(int r1,int g1,int b1, int r2,int g2,int b2) {
 // BC1
 // ─────────────────────────────────────────────────────────────────────────────
 
-std::vector<uint8_t> Bc1Decode(const std::vector<uint8_t>& bd, int W, int H) {
-    int bx=W/4, by=H/4;
-    std::vector<uint8_t> out((size_t)W*H*4);
-    uint8_t pal[16];
-    for (int iy=0;iy<by;iy++) for (int ix=0;ix<bx;ix++) {
-        const uint8_t* b = bd.data()+(iy*bx+ix)*8;
-        uint16_t c0r,c1r; memcpy(&c0r,b,2); memcpy(&c1r,b+2,2);
-        uint32_t idx; memcpy(&idx,b+4,4);
-        auto [r0,g0,b0]=Rgb565Decode(c0r);
-        auto [r1,g1,b1]=Rgb565Decode(c1r);
-        pal[0]=r0;pal[1]=g0;pal[2]=b0;pal[3]=255;
-        pal[4]=r1;pal[5]=g1;pal[6]=b1;pal[7]=255;
-        if(c0r>c1r){
-            pal[8]=(uint8_t)((2*r0+r1)/3);pal[9]=(uint8_t)((2*g0+g1)/3);
-            pal[10]=(uint8_t)((2*b0+b1)/3);pal[11]=255;
-            pal[12]=(uint8_t)((r0+2*r1)/3);pal[13]=(uint8_t)((g0+2*g1)/3);
-            pal[14]=(uint8_t)((b0+2*b1)/3);pal[15]=255;
-        } else {
-            pal[8]=(uint8_t)((r0+r1)/2);pal[9]=(uint8_t)((g0+g1)/2);
-            pal[10]=(uint8_t)((b0+b1)/2);pal[11]=255;
-            pal[12]=pal[13]=pal[14]=pal[15]=0;
-        }
-        for(int row=0;row<4;row++) for(int col=0;col<4;col++){
-            int pi=(idx>>(2*(row*4+col)))&3;
-            int dst=((iy*4+row)*W+(ix*4+col))*4;
-            memcpy(out.data()+dst,pal+pi*4,4);
-        }
-    }
-    return out;
-}
+
 
 static void AssignBc1Indices(const uint8_t blk[64], uint16_t c0, uint16_t c1,
                               bool use3Color, uint8_t* out, int off) {
@@ -1050,39 +970,7 @@ std::vector<uint8_t> Bc1Encode(const std::vector<uint8_t>& srgbRgba, int W, int 
 // BC3
 // ─────────────────────────────────────────────────────────────────────────────
 
-std::vector<uint8_t> Bc3Decode(const std::vector<uint8_t>& bd, int W, int H) {
-    int bx=W/4,by=H/4;
-    std::vector<uint8_t> out((size_t)W*H*4);
-    uint8_t alphas[8];
-    for(int iy=0;iy<by;iy++) for(int ix=0;ix<bx;ix++){
-        const uint8_t* b=bd.data()+(iy*bx+ix)*16;
-        uint8_t a0=b[0],a1=b[1];
-        uint64_t aib=0; for(int i=0;i<6;i++) aib|=(uint64_t)b[2+i]<<(8*i);
-        alphas[0]=a0;alphas[1]=a1;
-        if(a0>a1){
-            alphas[2]=(uint8_t)((6*a0+a1)/7);alphas[3]=(uint8_t)((5*a0+2*a1)/7);
-            alphas[4]=(uint8_t)((4*a0+3*a1)/7);alphas[5]=(uint8_t)((3*a0+4*a1)/7);
-            alphas[6]=(uint8_t)((2*a0+5*a1)/7);alphas[7]=(uint8_t)((a0+6*a1)/7);
-        } else {
-            alphas[2]=(uint8_t)((4*a0+a1)/5);alphas[3]=(uint8_t)((3*a0+2*a1)/5);
-            alphas[4]=(uint8_t)((2*a0+3*a1)/5);alphas[5]=(uint8_t)((a0+4*a1)/5);
-            alphas[6]=0;alphas[7]=255;
-        }
-        uint16_t c0r,c1r; memcpy(&c0r,b+8,2); memcpy(&c1r,b+10,2);
-        uint32_t ci; memcpy(&ci,b+12,4);
-        auto [r0,g0,b0]=Rgb565Decode(c0r); auto [r1,g1,b1]=Rgb565Decode(c1r);
-        uint8_t pr[4]={r0,r1,(uint8_t)((2*r0+r1)/3),(uint8_t)((r0+2*r1)/3)};
-        uint8_t pg[4]={g0,g1,(uint8_t)((2*g0+g1)/3),(uint8_t)((g0+2*g1)/3)};
-        uint8_t pb[4]={b0,b1,(uint8_t)((2*b0+b1)/3),(uint8_t)((b0+2*b1)/3)};
-        for(int row=0;row<4;row++) for(int col=0;col<4;col++){
-            int pi=row*4+col;
-            int dst=((iy*4+row)*W+(ix*4+col))*4;
-            out[dst]=pr[(ci>>(2*pi))&3];out[dst+1]=pg[(ci>>(2*pi))&3];
-            out[dst+2]=pb[(ci>>(2*pi))&3];out[dst+3]=alphas[(aib>>(3*pi))&7];
-        }
-    }
-    return out;
-}
+
 
 // Bc3Encode now takes sRGB-u8 RGBA. The color block goes through the Custom
 // encoder (4-color mode, no alpha cutout since BC3 carries alpha separately).
@@ -1110,60 +998,11 @@ std::vector<uint8_t> Bc3Encode(const std::vector<uint8_t>& srgbRgba, int W, int 
 // Decode pipeline  (no exceptions)
 // ─────────────────────────────────────────────────────────────────────────────
 
-std::string DecodeCanvas(const std::vector<uint8_t>& raw, RgbaImage& out, bool noSrgb) {
-    int totalPx = (int)(raw.size() / 4);
-    int side = (int)std::sqrt((double)totalPx);
-    int w = (side*side == totalPx) ? side : 256;
-    int h = totalPx / w;
-    if ((size_t)(w*h*4) != raw.size())
-        return "Canvas: unexpected size " + std::to_string(raw.size());
 
-    auto pixels = DeswizzleBlockLinear(raw, w, h, 4, DefaultBlockHeight);
-    if (!noSrgb) ConvertLinearToSrgb(pixels);
 
-    out.width  = w;
-    out.height = h;
-    out.pixels = std::move(pixels);
-    return "";
-}
 
-std::string DecodeUgctex(const std::vector<uint8_t>& raw, RgbaImage& out, bool noSrgb) {
-    UgctexLayout layout{};
-    std::string err;
-    if (!DetectUgctexLayoutInner(raw.size(), layout, err)) return err;
 
-    int vbw = layout.Width  / 4;
-    int vbh = layout.Height / 4;
-    auto blocks = DeswizzleBlockLinear(raw, vbw, vbh, layout.BytesPerBlock(), layout.BlockHeight);
 
-    std::vector<uint8_t> rgba = (layout.Format == TextureFormat::Bc3)
-        ? Bc3Decode(blocks, layout.Width, layout.Height)
-        : Bc1Decode(blocks, layout.Width, layout.Height);
-
-    if (!noSrgb) ConvertLinearToSrgb(rgba);
-
-    out.width  = layout.Width;
-    out.height = layout.Height;
-    out.pixels = std::move(rgba);
-    return "";
-}
-
-std::string DecodeThumb(const std::vector<uint8_t>& raw, RgbaImage& out, bool noSrgb) {
-    int totalBlocks = (int)(raw.size() / 16);
-    int gs = (int)std::sqrt((double)totalBlocks);
-    if (gs*gs != totalBlocks)
-        return "Thumb: not square BC3 (" + std::to_string(raw.size()) + " bytes)";
-
-    int tw = gs*4, th = gs*4;
-    auto blocks = DeswizzleBlockLinear(raw, gs, gs, 16, ThumbBlockHeight);
-    auto rgba   = Bc3Decode(blocks, tw, th);
-    if (!noSrgb) ConvertLinearToSrgb(rgba);
-
-    out.width  = tw;
-    out.height = th;
-    out.pixels = std::move(rgba);
-    return "";
-}
 
 std::string DecodeFile(const std::string& path, RgbaImage& out, bool noSrgb) {
     std::vector<uint8_t> raw;

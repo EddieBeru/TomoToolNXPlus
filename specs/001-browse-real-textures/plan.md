@@ -116,6 +116,7 @@ include/
   ugc_scanner.h                  # asociación pura y wrapper legado
 source/
   texture_browser.cpp            # transiciones, contexto, selección y validaciones
+  texture_browser_preview.cpp    # prioridad de fuentes y lectura/CPU decode de preview
   texture_decode.cpp             # extracción CPU de texture_processor.cpp
   ugc_names.cpp                  # lectura pura de índice WStr64Array
   ugc_scanner.cpp                # extracción/adaptación preservando Scan
@@ -134,6 +135,9 @@ apps/borealis/
   resources/i18n/{en-US,es,es-419}/ # traducciones en carpetas existentes
   CMakeLists.txt                 # fuentes CPU, adaptador y zstd existente
 tests/
+  texture_browser_preview_test.cpp
+  ugc_scanner_test.cpp
+  run_texture_browser.sh
   texture_browser_test.cpp
   texture_decode_test.cpp
   ugc_names_test.cpp

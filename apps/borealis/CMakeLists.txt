@@ -19,14 +19,20 @@ add_subdirectory("${BOREALIS_LIBRARY}" borealis EXCLUDE_FROM_ALL)
 # Borealis needs RTTI and exceptions; the SDL target keeps its own flags.
 target_compile_options(borealis PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-frtti;-fexceptions>)
 
-add_executable(TomoToolNXPlusBorealis source/main.cpp source/app.cpp source/texture_settings_screen.cpp
+add_executable(TomoToolNXPlusBorealis source/main.cpp source/app.cpp source/texture_settings_screen.cpp source/texture_browser_screen.cpp source/texture_preview_view.cpp
+    source/texture_browser_session.cpp source/texture_read_source.cpp
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../source/ugc_names.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../source/texture_browser.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../source/texture_browser_preview.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../source/texture_decode.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../source/ugc_scanner.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../source/texture_settings.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../source/texture_settings_config.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../source/texture_settings_store.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../source/focus_navigation.cpp"
     "${BOREALIS_LIBRARY}/lib/platforms/switch/switch_wrapper.c")
 target_include_directories(TomoToolNXPlusBorealis PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../include")
-target_link_libraries(TomoToolNXPlusBorealis PRIVATE borealis)
+target_link_libraries(TomoToolNXPlusBorealis PRIVATE borealis zstd)
 target_link_options(TomoToolNXPlusBorealis PRIVATE
     "-Wl,--gc-sections,-Map,${CMAKE_CURRENT_BINARY_DIR}/TomoToolNXPlusBorealis.map")
 

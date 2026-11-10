@@ -58,3 +58,27 @@ exclusive creation, short writes, read/write/flush/close/verification failures
 and reopen persistence. This models POSIX file failures on the host, not SD card
 power loss or libnx behavior. The backup remains available after partial writes;
 retry is blocked until configuration is reloaded.
+
+## Read-only Borealis texture browser
+
+From the repository root, with host C++17 and the existing host zstd library:
+
+```sh
+tests/run_texture_browser.sh
+SANITIZE=1 tests/run_texture_browser.sh
+```
+
+The script compiles seven independent executables in a temporary directory, runs them,
+and removes only that directory. It covers CPU decode golden outputs from the old
+implementation, BC1/BC3 and rectangular canvas layouts, bounded zstd, filename association,
+Player names/index/UTF-16 validation, account-local catalogs, refresh/context transitions,
+preview priority/fallback, and worker cancellation/replaced pending jobs/stale deliveries.
+The real libnx adapter is compiled against tests/support/switch.h to check read-only
+opens, flags, sizes, complete reads, metadata classification, failures and handle cleanup.
+The shim include path is never used by either Switch build. It cannot establish HOS
+permissions, renderer behavior, input usability, SD behavior or game compatibility.
+
+No personal fixtures are used. Catalog snapshots and operation traces remain in memory;
+no save/config/cache writes are exposed by the browser source. Source/map auditing
+complements these checks. Physical acceptance remains pending: see
+[the validation guide](../specs/001-browse-real-textures/quickstart.md).

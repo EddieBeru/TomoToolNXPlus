@@ -1,4 +1,5 @@
 #include "app.hpp"
+#include "texture_browser_screen.hpp"
 #include "texture_settings_screen.hpp"
 #include "texture_settings_store.h"
 
@@ -56,7 +57,7 @@ brls::DetailCell* addAction(brls::Box* list, const std::string& text,
 class Navigation : public brls::Box
 {
 public:
-    Navigation() : Box(brls::Axis::ROW)
+    Navigation(std::shared_ptr<TextureBrowser::Session> session, std::function<void()> exit) : Box(brls::Axis::ROW)
     {
         sidebar = new brls::Sidebar();
         sidebar->setWidth(brls::Application::getStyle()["brls/tab_frame/sidebar_width"]);
@@ -74,21 +75,16 @@ public:
 
         for (size_t i = 0; i < pages.size(); ++i)
         {
-            auto* list = makeList(names[i], descriptions[i]);
-            if (i == 1)
-            {
-                addAction(list, "app/settings"_i18n, "hints/open"_i18n,
-                    [this](brls::View*) {
-                        brls::Application::pushActivity(new brls::Activity(createTextureSettingsScreen(TextureSettings::ConfigPath)));
-                    });
-                addSample(list, "app/shirt"_i18n, "app/ready"_i18n);
-                addSample(list, "app/room"_i18n, "app/ready"_i18n);
-                addSample(list, "app/empty_slot"_i18n, "app/empty"_i18n);
+            if(i==1) {
+                browser=new TextureBrowserScreen(session,[this]{focusSidebar();});
+                pages[i]=browser;
+                continue;
             }
-            else if (i == 0)
+            auto* list = makeList(names[i], descriptions[i]);
+            if (i == 0)
             {
-                addAction(list, "app/exit"_i18n, "", [](brls::View*) {
-                    brls::Application::quit();
+                addAction(list, "app/exit"_i18n, "", [exit](brls::View*) {
+                    exit();
                 });
             }
             else
@@ -139,9 +135,11 @@ private:
         if (index == active)
             return;
         // Keep each tab's controls, in-memory values, focus and scroll position.
+        if(active==1)browser->deactivateBrowser();
         content->clearViews(false);
         active = index;
         content->addView(pages[active]);
+        if(active==1)browser->activateBrowser();
     }
 
     void switchTab(int direction)
@@ -157,6 +155,7 @@ private:
         brls::Application::giveFocus(sidebar->getItem(active));
     }
 
+    TextureBrowserScreen* browser=nullptr;
     brls::Sidebar* sidebar;
     brls::Box* content;
     std::array<brls::ScrollingFrame*, 5> pages{};
@@ -164,9 +163,9 @@ private:
 };
 } // namespace
 
-brls::View* createRoot()
+brls::View* createRoot(std::shared_ptr<TextureBrowser::Session> session, std::function<void()> exit)
 {
-    auto* frame = new brls::AppletFrame(new Navigation());
+    auto* frame = new brls::AppletFrame(new Navigation(std::move(session),std::move(exit)));
     frame->setTitle("app/title"_i18n);
     // The app has an explicit focusable Exit control instead of a root B exit.
     frame->registerAction("", brls::BUTTON_B, [](brls::View*) { return true; }, true);

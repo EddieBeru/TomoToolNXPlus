@@ -110,3 +110,50 @@ Physical Switch validation of this new configuration workflow, real SD failure
 behavior, dark theme and docked scaling remain pending. Prior user-reported
 hardware success applies to the earlier pilot builds. This slice cannot verify
 game-save compatibility because it does not access game saves.
+
+## Read-only texture browser — implementation of feature 001
+
+Textures now lists real UGC files for a selected account, with optional names from
+Player.sav and a detail preview. Other browser tabs remain samples. Texture Settings
+keeps its existing draft/store behavior. This slice adds no texture mutation or export.
+
+The new Switch source owns a private filesystem opened with fsOpen_SaveDataReadOnly,
+not SaveMount or a writable devoptab mount. Files use FsOpenMode_Read; metadata enumeration
+separates a missing save from an access failure. Read, size and enumeration errors are
+reported; Player name failures degrade to identifiers. No source operation exposes
+create/write/delete/rename/commit. Handles close on the worker before its session ends.
+
+A serial session owns one active and one replaceable pending request. Delivery uses
+weak lifetime tokens and a generation guard. Leaving a loading catalog suspends it;
+returning reloads once with a new generation and retains navigation context. Entering
+settings or dialogs cannot publish UI changes into an inactive page. Exit cancels work
+and keeps the event loop running until the worker has drained, before quitting.
+
+CPU decoding is extracted from TextureProcessor into texture_decode.cpp; existing
+encoder/import entry points remain in the legacy module. The legacy Scan wrapper retains
+its old behavior; the new pure Associate operation adds deterministic order, ambiguity
+warnings and bounded catalogs for this browser. Names use the real typed index, bounded
+heap/count spans and validated UTF-16, without linking MiiManager or save writers.
+Preview chooses a valid rectangular canvas, otherwise the main texture; canvas failure
+falls back with a warning. NanoVG images are uploaded/released on the UI/context thread,
+FIT over a checkerboard, with no temporary image files or cross-renderer SDL textures.
+
+Operational limits: Player 8 MiB, individual compressed/output image 4 MiB, zstd window
+8 MiB, image axes 1024, 2048 primary textures and 8192 directory records. Exceeding limits
+is an explicit error, never a successful truncated catalog. These are application limits,
+not claimed game-format maxima. Paths/config/backups and WebUI remain unchanged.
+
+### Verification and remaining acceptance
+
+Host checks cover catalogs 0/1/100, names, layouts/golden pixels, zstd limits, source
+failures, read-only API flags, cancellation and stale deliveries. Run
+[the seven host suites](../tests/README.md#read-only-borealis-texture-browser).
+Both Makefile targets cross-build; source/link-map inspection complements the source tests.
+No personal saves were accessed or modified. Builds are not proof of compatibility.
+
+No emulator or physical Switch run was performed for this slice. Controller/touch,
+modal transitions, focus/scroll restoration on the renderer, three-language text layout,
+light/dark themes, handheld/docked rendering, real account-save permissions and the
+latency target still require the [acceptance guide](../specs/001-browse-real-textures/quickstart.md).
+Its SC matrix distinguishes host evidence from pending physical acceptance. Do not call
+this a fully verified editor replacement or infer success from the task checkboxes.

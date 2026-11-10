@@ -31,6 +31,13 @@ struct UgcTextureEntry {
 
 namespace UgcScanner {
 
+struct Association {
+    std::vector<UgcTextureEntry> entries;
+    bool ok=true;
+    bool limit=false;
+    bool warning=false;
+};
+Association Associate(const std::vector<std::string>& filenames);
 std::vector<UgcTextureEntry> Scan(const std::string& folderPath);
 
 } // namespace UgcScanner

@@ -55,22 +55,24 @@ There are two independent build targets during the migration:
 | `TomoToolNXPlus.nro` | Existing SDL editor, including its broader editing features and WebUI |
 | `TomoToolNXPlusBorealis.nro` | Incremental Switch UI migration using Borealis's standard components and system themes |
 
-The Borealis target is **not yet a replacement for the full editor**. Its browser
-tabs still contain sample data. Its first functional screen is Texture Settings:
-canvas shape, encoder, BC1 mode, image fit and background. It reuses the existing
-settings model, keeps edits as drafts, and offers explicit saving and discard
-choices.
+The Borealis target is **not yet a replacement for the full editor**. Textures now
+lists a selected account's real saved UGC content in read-only mode, with optional
+names and detail previews. Mii, Player and Map still contain sample data. Texture
+Settings edits canvas shape, encoder, BC1 mode, image fit and background as drafts,
+with explicit saving and discard choices.
 
 Those preferences use the existing `/switch/TomoToolNX/config.ini`. The migrated
 writer preserves unrelated settings and legacy theme/color keys, verifies a
 backup before overwriting an existing config, and checks the final write. The
-Borealis target does not mount or edit game saves. WebUI remains outside this
-Switch UI migration.
+Borealis target opens a private read-only game-save filesystem for browsing; it
+does not edit or commit game saves. WebUI remains outside this Switch UI migration.
 
 Earlier Plus builds have user-reported success on real Switch hardware. The new
 Borealis v0.2.0 preference workflow has host regression and adapted-emulator
 checks; its physical SD/configuration behavior still needs hardware validation.
-Existing legacy code has not all been brought up to the fork's development rules.
+The new read-only texture browser has host tests and cross-build evidence, but no
+emulator or physical Switch validation yet. Existing legacy code has not all been
+brought up to the fork's development rules.
 
 See [the Borealis port record](docs/BOREALIS_PORT.md),
 [migration boundaries and recovery](docs/BOREALIS_MIGRATION.md), and
@@ -79,7 +81,7 @@ See [the Borealis port record](docs/BOREALIS_PORT.md),
 ## Where it is going
 
 1. Complete functional screens in small, independently reviewable steps.
-2. Move the texture browser to real read-only data.
+2. Validate the real read-only texture browser on physical Switch hardware.
 3. Connect texture operations through shared validation, backup and save workflows.
 4. Migrate the remaining Switch screens while reducing main.cpp's responsibilities.
 

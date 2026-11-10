@@ -1,8 +1,8 @@
 # Quickstart: validación del navegador de texturas
 
-Esta guía describe verificaciones a ejecutar después de implementar el slice. Actualmente
-solo existen los documentos de diseño; no se han creado los tests nuevos ni se ha validado
-este navegador. Resultados host, emulador y físicos deben informarse por separado.
+Esta guía contiene los checks de la implementación y las rutas de aceptación pendientes.
+Las suites host y cross-builds se ejecutaron; no se ha validado este navegador en emulador
+ni Switch físico. Los resultados de cada plataforma se informan por separado.
 
 ## Prerrequisitos
 
@@ -35,52 +35,18 @@ es un fallo de test aunque el resultado final de los archivos sea idéntico.
 
 ## Checks host
 
-Desde la raíz del repositorio, ejecutar primero los comandos existentes de `tests/README.md`
-para settings, config y save safety. Ejecutar estos comandos nuevos una vez existan las
-fuentes propuestas y sus tests; todavía no son pruebas disponibles en este checkout:
+Desde la raíz del repositorio, con compilador C++17 y zstd host ya disponibles:
 
 ```sh
-g++ -std=c++17 -Wall -Wextra -Werror -fno-exceptions -fno-rtti -Iinclude \
-  source/ugc_scanner.cpp source/ugc_names.cpp source/texture_browser.cpp \
-  tests/texture_browser_test.cpp -o /tmp/tomotool-texture-browser-test
-/tmp/tomotool-texture-browser-test
-
-g++ -std=c++17 -Wall -Wextra -Werror -fno-exceptions -fno-rtti -Iinclude \
-  source/texture_decode.cpp tests/texture_decode_test.cpp -lzstd \
-  -o /tmp/tomotool-texture-decode-test
-/tmp/tomotool-texture-decode-test
-
-g++ -std=c++17 -Wall -Wextra -Werror -fno-exceptions -fno-rtti -Iinclude \
-  source/ugc_names.cpp tests/ugc_names_test.cpp -o /tmp/tomotool-ugc-names-test
-/tmp/tomotool-ugc-names-test
+tests/run_texture_browser.sh
+SANITIZE=1 tests/run_texture_browser.sh
 ```
 
-El adaptador real se compila contra el shim host de libnx propuesto en research; ese
-include path nunca debe usarse en los targets Switch. El worker recibe una cola de entrega
-inyectada, sin incluir Borealis. Una vez implementados, ejecutar:
-
-```sh
-g++ -std=c++17 -Wall -Wextra -Werror -Itests/support -Iinclude \
-  -Iapps/borealis/source apps/borealis/source/texture_read_source.cpp \
-  tests/texture_read_source_test.cpp -o /tmp/tomotool-read-source-test
-/tmp/tomotool-read-source-test
-
-g++ -std=c++17 -Wall -Wextra -Werror -Iinclude -Iapps/borealis/source \
-  source/ugc_scanner.cpp source/ugc_names.cpp source/texture_decode.cpp \
-  source/texture_browser.cpp apps/borealis/source/texture_browser_session.cpp \
-  tests/texture_browser_session_test.cpp -pthread -lzstd \
-  -o /tmp/tomotool-browser-session-test
-/tmp/tomotool-browser-session-test
-```
-
-La implementación mantendrá estos comandos y sus dependencias finales en `tests/README.md`.
-Se exige verificar secuencia real de apertura read-only, flags de archivos y cierres con
-el shim, además de probar resultados del modelo. El shim no verifica el servicio HOS real.
-
-Repetir nuevos tests con `-fsanitize=address,undefined -fno-omit-frame-pointer -g`.
-Esperado: salida exitosa, ninguna violación de memoria, ningún intento de escritura,
-fixtures idénticos y todos los fallos con categoría prevista. Verificar los tres layouts,
-comparación de pixels conocidos tras la extracción y regressions de decode legado.
+El script contiene comandos exactos para siete ejecutables: decoder, scanner, nombres,
+modelo, preview, sesión y adaptador real con shim libnx. Véase
+[tests/README.md](../../tests/README.md) para cobertura, limitaciones y regresiones
+existentes de settings/config/save safety. El shim nunca se usa en builds Switch.
+Los fallos se programan sobre fuentes sintéticas; no se necesitan guardados personales.
 
 ## Compilación Switch y auditoría del límite de lectura
 
@@ -138,3 +104,42 @@ Registrar cada SC-001–SC-007 como aprobado/fallido/pendiente, con fecha, entor
 Separar identidad de archivos de ausencia de intentos de mutación. Reportar por separado
 host, emulador y consola, permisos reales, lifecycle, latencia, traducciones y escalado.
 Una matriz incompleta no permite afirmar reemplazo funcional completo ni validación física.
+
+## Implementation baseline — 2026-11-09
+
+Starting commit: 6df9a1d; working tree clean before implementation. Existing Borealis
+Texture Settings uses real config; texture entries remain samples. Installed devkitPro,
+libnx and portlibs are available; no toolchain installation is planned.
+SC-001 through SC-007 are initially pending for this feature. Existing evidence described
+above belongs to older slices and does not validate the new read-only browser.
+
+## Evidencia de esta implementación — 2026-11-09
+
+- Siete suites host nuevas: aprobadas, también con AddressSanitizer/UndefinedBehaviorSanitizer.
+- Regresiones existentes de focus/settings, config y save safety: aprobadas.
+- Decoder: golden hashes de cinco buffers sintéticos calculados antes de la extracción;
+  las salidas del módulo extraído coinciden. El host carece de SDL2_image: se compiló la
+  sección CPU original aislada para obtener la referencia, sin instalar dependencias.
+- Configuración de build: fuentes añadidas por incremento; fuente de preview aislada en
+  source/texture_browser_preview.cpp para que el modelo no dependa del codec.
+- Modelos/fuentes falsas usan memoria sintética. El adaptador real se prueba con el shim;
+  esto no equivale a acceso a un guardado real desde el host.
+- No se ejecutó emulador ni Switch físico. No se sembró/restauró ningún guardado.
+
+| Criterio | Evidencia host | Aceptación en consola |
+| --- | --- | --- |
+| SC-001 | Catálogos 0/1/100 y asociación/preview aprobados | Pendiente de fuente real e inspección visual |
+| SC-002 | Rutas de acciones revisadas en código | Pendiente control/touch |
+| SC-003 | Identidad, suspensión/reanudación y fallback aprobados | Pendiente 20 ciclos y 10 cambios de pestaña |
+| SC-004 | Fallos de fuente/modelo/preview y retry aprobados | Pendiente presentación e interacción |
+| SC-005 | Worker fuera de UI, cola acotada | Pendiente medición física, sin tiempos atribuidos |
+| SC-006 | Snapshots sintéticos, flags read-only y llamadas auditadas | Pendiente recorrido completo y comparación física |
+| SC-007 | JSON válido y mismas claves browser en tres idiomas | Pendiente layout, temas, dock y texto largo |
+
+Las tareas de aceptación que requieren esos recorridos permanecen sin marcar.
+El resultado no demuestra compatibilidad del guardado ni reemplazo completo del editor.
+
+Final cross-builds: make -j4 and make -j4 borealis passed after implementation.
+ELF symbol audit confirms fsOpen_SaveDataReadOnly and no SaveMount, SaveWorkflow,
+SaveEditor, MiiManager or TextureProcessor import/encoder symbols. Browser locale key
+sets match across all three included languages. No emulator or hardware result is claimed.

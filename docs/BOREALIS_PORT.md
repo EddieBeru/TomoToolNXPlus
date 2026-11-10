@@ -1,8 +1,10 @@
 # Borealis Switch port
 
-This is an independent Switch UI migration target. Browser tabs use synthetic
-data; Texture Settings v0.2.0 edits the real application preferences. It does not
-replace the current application. WebUI is outside its scope.
+This is an independent Switch UI migration target. Textures reads real UGC content
+from a selected account and provides previews without save writes. Other browser tabs
+remain samples. Texture Settings edits real preferences. The read-only browser has
+host/build evidence; physical acceptance remains pending. It does not replace the full
+application. WebUI presentation/transport are outside this migration.
 
 ## Build
 
@@ -37,15 +39,14 @@ Deko3D is not used: the earlier evaluation could not find `glm/vec2.hpp`.
 ## Scope and isolation
 
 The root destinations remain WebUI, Textures, Mii, Player and Map. Textures opens
-the real Texture Settings as a child. The other pages and texture slots remain
-samples. The current NRO version is 0.2.0, authored by EddieBeru.
+the real Texture Settings as a child. The other pages remain samples; texture slots use real data. The current NRO version is 0.2.0, authored by EddieBeru.
 
-The target links the shared texture-settings model, flat-config serialization,
-SD preference store and focus utilities, plus Borealis/platform dependencies.
-It does not link or call SaveMount, SaveEditor, SaveWorkflow or HTTP. It never
-mounts game saves. It reads/writes `/switch/TomoToolNX/config.ini` only through
-the preference store, which preserves unrelated fields and legacy theme/color
-keys. Borealis continues to use its system theme. No theme picker is migrated.
+The target links shared settings, bounded CPU texture decoding, catalog/name parsing,
+focus utilities and a private read-only libnx source. It does not link SaveMount,
+SaveEditor, SaveWorkflow, MiiManager, HTTP or the TextureProcessor writers. ConfigStore
+continues its separate explicit preference writes. The browser neither edits game saves
+nor writes caches/backups. Source/map audit and host shim checks do not establish HOS
+permissions or real console behavior.
 
 See [migration boundaries and recovery](BOREALIS_MIGRATION.md) for persistence
 semantics and how SDL drawing, previews and canvases will be ported.
@@ -67,8 +68,7 @@ included; other system locales fall back to English.
 ## Validation boundaries
 
 A successful host cross-build establishes that an NRO can be produced, not
-hardware usability or game-save compatibility. This port contains no save
-workflow and cannot establish save compatibility. Physical Switch testing is
+hardware usability or game-save compatibility. Its read-only browser cannot establish save-write compatibility. Physical Switch testing is
 required before a production migration.
 
 ## Naming and direction
@@ -77,7 +77,7 @@ Borealis is the approved visual direction and primary Switch UI migration target
 Sources live in `apps/borealis/`; build with `make borealis` and clean with
 `make borealis-clean`. The old `borealis-prototype` commands remain compatibility
 aliases. The NRO filename remains `TomoToolNXPlusBorealis.nro`, with launcher title
-`TomoToolNXPlus Borealis` and author EddieBeru. Sample pages still indicate
+`TomoToolNXPlus Borealis` and author EddieBeru. Other sample pages still indicate
 unfinished functionality; approving the appearance does not mark migration complete.
 
 Host verification: `make borealis`, its compatibility alias and the default SDL

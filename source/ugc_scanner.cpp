@@ -79,3 +79,46 @@ std::vector<UgcTextureEntry> Scan(const std::string& folderPath) {
 }
 
 } // namespace UgcScanner
+
+namespace UgcScanner {
+Association Associate(const std::vector<std::string>& filenames) {
+    auto lowerAscii=[](std::string value) {
+        for(auto& c:value)if(c>='A' && c<='Z')c=char(c+('a'-'A'));
+        return value;
+    };
+    Association result;
+    if(filenames.size()>8192) {result.ok=false;result.limit=true;return result;}
+    std::map<std::string,std::vector<std::string>> byName;
+    std::vector<std::string> mains;
+    for(const auto& name:filenames) {
+        if(name.empty() || name=="." || name==".." || name.find_first_of("/\\")!=std::string::npos) {
+            result.ok=false; return result;
+        }
+        auto lower=lowerAscii(name);
+        byName[lower].push_back(name);
+        if(EndsWith(lower,".ugctex.zs") && !EndsWith(lower,"_thumb.ugctex.zs")
+           && !EndsWith(lower,"_thumb_ugctex.zs")) {
+            if(name.size()==10){result.ok=false;return result;}
+            mains.push_back(name);
+        }
+    }
+    if(mains.size()>2048) {result.ok=false;result.limit=true;return result;}
+    std::sort(mains.begin(),mains.end(),[&](const auto& a,const auto& b) {
+        auto x=lowerAscii(a), y=lowerAscii(b);return x==y?a<b:x<y;
+    });
+    for(const auto& main:mains) {
+        UgcTextureEntry e; e.stem=main.substr(0,main.size()-10); e.ugctexPath=main;
+        auto associate=[&](const std::string& suffix) {
+            auto it=byName.find(lowerAscii(e.stem+suffix));
+            if(it==byName.end()) return std::string{};
+            if(it->second.size()!=1) {result.warning=true;return std::string{};}
+            return it->second.front();
+        };
+        e.canvasPath=associate(".canvas.zs");
+        e.thumbPath=associate("_Thumb_ugctex.zs");
+        if(e.thumbPath.empty()) e.thumbPath=associate("_Thumb.ugctex.zs");
+        result.entries.push_back(std::move(e));
+    }
+    return result;
+}
+}

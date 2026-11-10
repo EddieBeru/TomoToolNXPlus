@@ -37,3 +37,6 @@ data/webui_gz.bin
 
 # Local UI screenshots
 /docs/images/
+
+# Temporary host validation files
+*.tmp
