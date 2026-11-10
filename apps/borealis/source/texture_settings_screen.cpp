@@ -1,4 +1,5 @@
 #include "texture_settings_screen.hpp"
+#include "exit_menu.hpp"
 #include "texture_settings_store.h"
 
 #include <array>
@@ -11,8 +12,8 @@ using TextureSettings::Row;
 
 class SettingsScreen : public brls::AppletFrame {
 public:
-    explicit SettingsScreen(const std::string& path)
-        : AppletFrame(new brls::ScrollingFrame()), store(path) {
+    SettingsScreen(const std::string& path, std::function<void()> exit)
+        : AppletFrame(new brls::ScrollingFrame()), store(path), requestExit(std::move(exit)) {
         setTitle("app/settings"_i18n);
         auto* list = new brls::Box(brls::Axis::COLUMN);
         auto style = brls::Application::getStyle();
@@ -49,6 +50,11 @@ public:
             list->addView(descriptions[i]);
         }
         saveControl = action(list, "preferences/save"_i18n, [this] { save(false); });
+        if(requestExit) {
+            action(list,"app/exit_menu"_i18n,[this]{exitMenu();});
+            registerAction("app/exit_menu"_i18n,brls::BUTTON_START,
+                [this](brls::View*){exitMenu();return true;});
+        }
         backControl = action(list, "hints/back"_i18n, [this] { back(); });
         static_cast<brls::ScrollingFrame*>(getContentView())->setContentView(list);
         registerAction("hints/back"_i18n, brls::BUTTON_B,
@@ -156,7 +162,7 @@ private:
         if (focus) brls::Application::giveFocus(ready ? rows[0] : reloadControl);
     }
 
-    void save(bool returnAfter) {
+    void save(bool returnAfter, bool exitAfter = false) {
         const auto result = store.Save(state);
         if (!result) {
             if (result.mayHaveChanged) ready = false;
@@ -175,8 +181,18 @@ private:
         status->setText("preferences/saved"_i18n);
         brls::Application::notify("preferences/saved"_i18n);
         refresh();
-        if (returnAfter) brls::Application::popActivity();
+        if (exitAfter) requestExit();
+        else if (returnAfter) brls::Application::popActivity();
         else brls::Application::giveFocus(backControl);
+    }
+
+    void exitMenu() {
+        if(!ready || !store.Dirty(state)) {showExitMenu(requestExit);return;}
+        auto* dialog=new brls::Dialog("app/exit_dirty"_i18n);
+        dialog->addButton("preferences/keep_editing"_i18n,[]{});
+        dialog->addButton("app/save_exit"_i18n,[this]{save(false,true);});
+        dialog->addButton("app/discard_exit"_i18n,requestExit);
+        dialog->open();
     }
 
     void back() {
@@ -190,6 +206,7 @@ private:
 
     TextureSettings::ConfigStore store;
     TextureSettings::State state;
+    std::function<void()> requestExit;
     bool ready = false;
     brls::Label* status;
     std::array<brls::DetailCell*, TextureSettings::RowCount> rows{};
@@ -198,7 +215,7 @@ private:
 };
 } // namespace
 
-brls::View* createTextureSettingsScreen(const std::string& configPath) {
-    return new SettingsScreen(configPath);
+brls::View* createTextureSettingsScreen(const std::string& configPath, std::function<void()> requestExit) {
+    return new SettingsScreen(configPath,std::move(requestExit));
 }
 } // namespace borealis_app

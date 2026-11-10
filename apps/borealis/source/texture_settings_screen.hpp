@@ -4,5 +4,5 @@
 #include <string>
 
 namespace borealis_app {
-brls::View* createTextureSettingsScreen(const std::string& configPath);
+brls::View* createTextureSettingsScreen(const std::string& configPath, std::function<void()> requestExit = {});
 }

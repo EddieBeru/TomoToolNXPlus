@@ -60,7 +60,8 @@ shows the native Switch profile selector at startup, then lists the confirmed
 account's real saved UGC content in read-only mode, with optional
 names and detail previews. Mii, Player and Map still contain sample data. Texture
 Settings edits canvas shape, encoder, BC1 mode, image fit and background as drafts,
-with explicit saving and discard choices.
+with explicit saving and discard choices. Plus and the sidebar’s Save/Exit control
+provide a return to the homebrew loader, after pending reads finish.
 
 Those preferences use the existing `/switch/TomoToolNX/config.ini`. The migrated
 writer preserves unrelated settings and legacy theme/color keys, verifies a

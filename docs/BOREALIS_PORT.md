@@ -58,11 +58,12 @@ B closes the innermost interaction or returns to the parent. Settings has five
 standard selector rows, Save preferences, Reload preferences and Back. Changes
 remain drafts until saved. Back with changes offers Save and return, Discard
 changes or Keep editing. Disabled rows are skipped and retain their values.
-Touch provides the same controls. Plus/Minus/X/Y remain unbound in this target.
+Touch provides the same controls. Plus opens Save/Exit; a persistent sidebar control
+provides the focus/touch route. Minus/X/Y remain unbound. Settings offers explicit
+save/discard/keep-editing choices before exit when its draft is dirty.
 
 The activity stack restores entry focus and isolates settings/dialogs from tab
-switching. Root tabs retain their cached focus and scroll. Exit remains a
-focusable/tappable WebUI row. English, Spanish and Latin American Spanish are
+switching. Root tabs retain their cached focus and scroll. Save/Exit is available in the persistent sidebar and the WebUI page. English, Spanish and Latin American Spanish are
 included; other system locales fall back to English.
 
 ## Validation boundaries

@@ -4,7 +4,7 @@
 namespace borealis_app {
 class TextureBrowserScreen : public brls::ScrollingFrame {
 public:
-    TextureBrowserScreen(std::shared_ptr<TextureBrowser::Session> session,std::function<void()> tabs);
+    TextureBrowserScreen(std::shared_ptr<TextureBrowser::Session> session,std::function<void()> tabs,std::function<void()> requestExit);
     ~TextureBrowserScreen() override;
     void onLayout() override;
     void willAppear(bool resetState=false) override;
@@ -17,6 +17,7 @@ private:
     std::shared_ptr<Life> life;
     std::shared_ptr<TextureBrowser::Session> session;
     TextureBrowser::Model model;
+    std::function<void()> requestExit;
     brls::Box* list=nullptr;
     brls::Box* entries=nullptr;
     brls::Label* status=nullptr;

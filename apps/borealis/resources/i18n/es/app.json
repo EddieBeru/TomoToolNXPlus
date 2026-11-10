@@ -52,5 +52,11 @@
   "browser_canvas": "Lienzo rectangular",
   "browser_main": "Textura principal",
   "browser_fallback": "No se pudo leer el lienzo. Se muestra la textura principal.",
-  "profile_not_selected": "No se seleccionó un perfil. Puedes elegir una cuenta en Texturas."
+  "profile_not_selected": "No se seleccionó un perfil. Puedes elegir una cuenta en Texturas.",
+  "exit_menu": "Guardar / Salir",
+  "exit_loader": "Salir al loader",
+  "exit_confirm": "¿Cerrar la app y volver al loader de homebrew?",
+  "exit_dirty": "Hay preferencias sin guardar. ¿Quieres guardarlas antes de salir?",
+  "save_exit": "Guardar preferencias y salir",
+  "discard_exit": "Descartar preferencias y salir"
 }

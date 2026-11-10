@@ -1,4 +1,5 @@
 #include "texture_browser_screen.hpp"
+#include "exit_menu.hpp"
 #include "texture_preview_view.hpp"
 #include "texture_settings_screen.hpp"
 #include "texture_settings_store.h"
@@ -45,10 +46,11 @@ class DetailScreen:public brls::AppletFrame {
     brls::DetailCell* retry;
     std::function<void()> returned;
     bool busy=false;
+    std::function<void()> requestExit;
 public:
-    DetailScreen(std::shared_ptr<Session> session,Entry entry,std::function<void()> returned):
+    DetailScreen(std::shared_ptr<Session> session,Entry entry,std::function<void()> returned,std::function<void()> exit):
         AppletFrame(new brls::ScrollingFrame()),life(std::make_shared<Life>(Life{this})),
-        session(std::move(session)),entry(std::move(entry)),returned(std::move(returned)) {
+        session(std::move(session)),entry(std::move(entry)),returned(std::move(returned)),requestExit(std::move(exit)) {
         setTitle(tr("detail"));
         auto* box=new brls::Box(brls::Axis::COLUMN);box->setPadding(20,28,20,28);
         static_cast<brls::ScrollingFrame*>(getContentView())->setContentView(box);
@@ -56,6 +58,9 @@ public:
         status=label(box,tr("loading"));
         image=new TexturePreviewView();box->addView(image);
         retry=action(box,tr("refresh"),[this]{load();});
+        action(box,"app/exit_menu"_i18n,[this]{showExitMenu(requestExit);});
+        registerAction("app/exit_menu"_i18n,brls::BUTTON_START,
+            [this](brls::View*){showExitMenu(requestExit);return true;});
         action(box,"hints/back"_i18n,[this]{back();});
         registerAction("hints/back"_i18n,brls::BUTTON_B,[this](brls::View*){back();return true;});
         load();
@@ -85,8 +90,8 @@ private:
     }
 };
 }
-TextureBrowserScreen::TextureBrowserScreen(std::shared_ptr<Session> session,std::function<void()> tabs):
-    life(std::make_shared<Life>(Life{this})),session(std::move(session)) {
+TextureBrowserScreen::TextureBrowserScreen(std::shared_ptr<Session> session,std::function<void()> tabs,std::function<void()> exit):
+    life(std::make_shared<Life>(Life{this})),session(std::move(session)),requestExit(std::move(exit)) {
     list=new brls::Box(brls::Axis::COLUMN);
     list->setPadding(24,28,24,28);setContentView(list);setGrow(1);
     auto* header=new brls::Header();header->setTitle("app/textures"_i18n);list->addView(header);
@@ -95,7 +100,7 @@ TextureBrowserScreen::TextureBrowserScreen(std::shared_ptr<Session> session,std:
     refreshControl=action(list,tr("refresh"),[this]{refresh();});
     action(list,"app/settings"_i18n,[this]{
         model.context.scroll=getContentOffsetY();
-        brls::Application::pushActivity(new brls::Activity(createTextureSettingsScreen(TextureSettings::ConfigPath)));
+        brls::Application::pushActivity(new brls::Activity(createTextureSettingsScreen(TextureSettings::ConfigPath,requestExit)));
     });
     status=label(list,tr("choose"));
     entries=new brls::Box(brls::Axis::COLUMN);list->addView(entries);
@@ -222,6 +227,6 @@ void TextureBrowserScreen::openEntry(const Entry& entry){
     std::weak_ptr<Life> weak=life;
     brls::Application::pushActivity(new brls::Activity(new DetailScreen(session,entry,[weak]{
         auto l=weak.lock();if(l && l->view)l->view->restore();
-    })));
+    },requestExit)));
 }
 }

@@ -11,11 +11,13 @@ int main()
 
     brls::Application::createWindow(brls::getStr("app/title"));
     brls::Application::setGlobalQuit(false);
+    brls::Application::getPlatform()->exitToHomeMode(false);
     const auto profile=borealis_app::selectStartupProfile();
     auto session=std::make_shared<TextureBrowser::Session>(TextureBrowser::createReadSource(),
         [](auto callback){brls::sync(callback);});
     bool closing=false;
     brls::Application::pushActivity(new brls::Activity(borealis_app::createRoot(session,[&] {
+        if(closing)return;
         closing=true;session->stop();
         brls::Application::notify(brls::getStr("app/browser_closing"));
     },profile)));

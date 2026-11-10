@@ -1,4 +1,5 @@
 #include "app.hpp"
+#include "exit_menu.hpp"
 #include "texture_browser_screen.hpp"
 #include "texture_settings_screen.hpp"
 #include "texture_settings_store.h"
@@ -61,7 +62,12 @@ public:
     {
         sidebar = new brls::Sidebar();
         sidebar->setWidth(brls::Application::getStyle()["brls/tab_frame/sidebar_width"]);
-        addView(sidebar);
+        auto* sidebarPanel=new brls::Box(brls::Axis::COLUMN);
+        sidebarPanel->setWidth(brls::Application::getStyle()["brls/tab_frame/sidebar_width"]);
+        sidebar->setGrow(1);
+        sidebarPanel->addView(sidebar);
+        addAction(sidebarPanel,"app/exit_menu"_i18n,"",[exit](brls::View*){showExitMenu(exit);});
+        addView(sidebarPanel);
         content = new brls::Box(brls::Axis::COLUMN);
         content->setGrow(1.0f);
         addView(content);
@@ -76,7 +82,7 @@ public:
         for (size_t i = 0; i < pages.size(); ++i)
         {
             if(i==1) {
-                browser=new TextureBrowserScreen(session,[this]{focusSidebar();});
+                browser=new TextureBrowserScreen(session,[this]{focusSidebar();},exit);
                 if(profile.state==ProfileSelectionState::Selected)
                     browser->setInitialProfile(profile.account);
                 pages[i]=browser;
@@ -85,8 +91,8 @@ public:
             auto* list = makeList(names[i], descriptions[i]);
             if (i == 0)
             {
-                addAction(list, "app/exit"_i18n, "", [exit](brls::View*) {
-                    exit();
+                addAction(list, "app/exit_loader"_i18n, "", [exit](brls::View*) {
+                    showExitMenu(exit);
                 });
             }
             else
@@ -109,6 +115,8 @@ public:
             sidebar->getItem(i)->registerAction("", brls::BUTTON_B,
                 [](brls::View*) { return true; }, true);
         }
+        registerAction("app/exit_menu"_i18n,brls::BUTTON_START,
+            [exit](brls::View*){showExitMenu(exit);return true;});
         registerAction("app/previous_tab"_i18n, brls::BUTTON_LT,
             [this](brls::View*) { switchTab(-1); return true; });
         registerAction("app/next_tab"_i18n, brls::BUTTON_RT,

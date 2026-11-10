@@ -52,5 +52,11 @@
   "browser_canvas": "Rectangular canvas",
   "browser_main": "Main texture",
   "browser_fallback": "The canvas could not be read. Showing the main texture.",
-  "profile_not_selected": "No profile was selected. You can choose an account in Textures."
+  "profile_not_selected": "No profile was selected. You can choose an account in Textures.",
+  "exit_menu": "Save / Exit",
+  "exit_loader": "Exit to loader",
+  "exit_confirm": "Exit the app and return to the homebrew loader?",
+  "exit_dirty": "There are unsaved preferences. Save them before exiting?",
+  "save_exit": "Save preferences and exit",
+  "discard_exit": "Discard preferences and exit"
 }
