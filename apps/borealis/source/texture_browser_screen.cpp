@@ -103,8 +103,13 @@ TextureBrowserScreen::TextureBrowserScreen(std::shared_ptr<Session> session,std:
     registerAction("app/tabs_hint"_i18n,brls::BUTTON_B,[tabs](brls::View*){tabs();return true;});
 }
 TextureBrowserScreen::~TextureBrowserScreen(){life->view=nullptr;session->cancel();}
+void TextureBrowserScreen::setInitialProfile(Account account){
+    if(!account.key.valid())return;
+    model.select(std::move(account));initialLoad=true;
+}
 void TextureBrowserScreen::activateBrowser(){
     active=true;
+    if(initialLoad){initialLoad=false;refresh(false);return;}
     if(model.resume())refresh(false);else if(dirty)render();else restore();
 }
 void TextureBrowserScreen::deactivateBrowser(){
@@ -171,7 +176,7 @@ void TextureBrowserScreen::render(){
     if(!active){dirty=true;return;}
     dirty=false;
     const auto& account=model.context.account;
-    accountControl->setText(model.hasAccount?tr("change")+": "+(account.name.empty()?tr("account"):account.name)+" ("+std::to_string(account.ordinal)+")":tr("choose"));
+    accountControl->setText(model.hasAccount?tr("change")+": "+(account.name.empty()?tr("account"):account.name)+(account.ordinal?" ("+std::to_string(account.ordinal)+")":""):tr("choose"));
     bool loading=model.state==State::CatalogLoading || model.state==State::AccountsLoading;
     refreshControl->setFocusable(model.hasAccount && !loading);
     refreshControl->setAlpha(model.hasAccount && !loading?1.0f:0.45f);

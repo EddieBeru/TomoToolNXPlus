@@ -82,3 +82,10 @@ No personal fixtures are used. Catalog snapshots and operation traces remain in 
 no save/config/cache writes are exposed by the browser source. Source/map auditing
 complements these checks. Physical acceptance remains pending: see
 [the validation guide](../specs/001-browse-real-textures/quickstart.md).
+
+## Native startup profile selector
+
+The same runner also executes profile_selector_test.cpp against the host libnx shim:
+selection/UID handoff, skip, setup/show errors, offline/no-creation settings and nickname
+lookup failures with balanced cleanup. It does not launch a real system applet.
+See [startup behavior and physical checks](../docs/PROFILE_SELECTION.md).

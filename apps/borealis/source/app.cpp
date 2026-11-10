@@ -57,7 +57,7 @@ brls::DetailCell* addAction(brls::Box* list, const std::string& text,
 class Navigation : public brls::Box
 {
 public:
-    Navigation(std::shared_ptr<TextureBrowser::Session> session, std::function<void()> exit) : Box(brls::Axis::ROW)
+    Navigation(std::shared_ptr<TextureBrowser::Session> session, std::function<void()> exit, const ProfileSelection& profile) : Box(brls::Axis::ROW)
     {
         sidebar = new brls::Sidebar();
         sidebar->setWidth(brls::Application::getStyle()["brls/tab_frame/sidebar_width"]);
@@ -77,6 +77,8 @@ public:
         {
             if(i==1) {
                 browser=new TextureBrowserScreen(session,[this]{focusSidebar();});
+                if(profile.state==ProfileSelectionState::Selected)
+                    browser->setInitialProfile(profile.account);
                 pages[i]=browser;
                 continue;
             }
@@ -98,6 +100,7 @@ public:
                 [this](brls::View*) { focusSidebar(); return true; }, false, false, brls::SOUND_BACK);
         }
 
+        if(profile.state==ProfileSelectionState::Selected)active=1;
         content->addView(pages[active]);
         for (size_t i = 0; i < pages.size(); ++i)
         {
@@ -110,6 +113,10 @@ public:
             [this](brls::View*) { switchTab(-1); return true; });
         registerAction("app/next_tab"_i18n, brls::BUTTON_RT,
             [this](brls::View*) { switchTab(1); return true; });
+        if(profile.state==ProfileSelectionState::Selected) {
+            brls::Application::giveFocus(sidebar->getItem(active));
+            brls::Application::giveFocus(pages[active]);
+        }
     }
 
     ~Navigation() override
@@ -163,9 +170,9 @@ private:
 };
 } // namespace
 
-brls::View* createRoot(std::shared_ptr<TextureBrowser::Session> session, std::function<void()> exit)
+brls::View* createRoot(std::shared_ptr<TextureBrowser::Session> session, std::function<void()> exit, const ProfileSelection& profile)
 {
-    auto* frame = new brls::AppletFrame(new Navigation(std::move(session),std::move(exit)));
+    auto* frame = new brls::AppletFrame(new Navigation(std::move(session),std::move(exit),profile));
     frame->setTitle("app/title"_i18n);
     // The app has an explicit focusable Exit control instead of a root B exit.
     frame->registerAction("", brls::BUTTON_B, [](brls::View*) { return true; }, true);

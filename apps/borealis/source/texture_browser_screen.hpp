@@ -9,6 +9,7 @@ public:
     void onLayout() override;
     void willAppear(bool resetState=false) override;
     void willDisappear(bool resetState=false) override;
+    void setInitialProfile(TextureBrowser::Account account);
     void activateBrowser();
     void deactivateBrowser();
 private:
@@ -24,6 +25,7 @@ private:
     bool active=false;
     bool restorePending=false;
     bool dirty=true;
+    bool initialLoad=false;
     brls::View* pendingFocus=nullptr;
     void choose();
     void refresh(bool begin=true);

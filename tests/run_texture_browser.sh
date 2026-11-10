@@ -20,3 +20,5 @@ run_test browser source/texture_browser.cpp source/ugc_scanner.cpp source/ugc_na
 run_test preview source/texture_decode.cpp source/texture_browser_preview.cpp tests/texture_browser_preview_test.cpp -lzstd
 run_test session -Iapps/borealis/source apps/borealis/source/texture_browser_session.cpp tests/texture_browser_session_test.cpp -pthread
 run_test read-source -Itests/support -Iapps/borealis/source apps/borealis/source/texture_read_source.cpp tests/texture_read_source_test.cpp
+
+run_test profile-selector -Itests/support -Iapps/borealis/source apps/borealis/source/profile_selector.cpp tests/profile_selector_test.cpp

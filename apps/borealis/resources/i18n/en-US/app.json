@@ -51,5 +51,6 @@
   "browser_preview_error": "The preview could not be displayed. Retry or return.",
   "browser_canvas": "Rectangular canvas",
   "browser_main": "Main texture",
-  "browser_fallback": "The canvas could not be read. Showing the main texture."
+  "browser_fallback": "The canvas could not be read. Showing the main texture.",
+  "profile_not_selected": "No profile was selected. You can choose an account in Textures."
 }

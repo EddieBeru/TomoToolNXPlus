@@ -39,3 +39,15 @@ Result fsFsOpenFile(FsFileSystem*,const char*,u32,FsFile*);
 Result fsFileGetSize(FsFile*,s64*);
 Result fsFileRead(FsFile*,s64,void*,u64,u32,u64*);
 void fsFileClose(FsFile*);
+
+enum PselUiMode { PselUiMode_UserSelector };
+struct PselUiSettings {
+    bool allowCreation = false;
+    bool networkRequired = false;
+    bool skipButton = false;
+};
+Result pselUiCreate(PselUiSettings*, PselUiMode);
+void pselUiSetAllowUserCreation(PselUiSettings*, bool);
+void pselUiSetNetworkServiceRequired(PselUiSettings*, bool);
+void pselUiSetSkipButtonEnabled(PselUiSettings*, bool);
+Result pselUiShow(PselUiSettings*, AccountUid*);

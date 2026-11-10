@@ -19,7 +19,7 @@ add_subdirectory("${BOREALIS_LIBRARY}" borealis EXCLUDE_FROM_ALL)
 # Borealis needs RTTI and exceptions; the SDL target keeps its own flags.
 target_compile_options(borealis PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-frtti;-fexceptions>)
 
-add_executable(TomoToolNXPlusBorealis source/main.cpp source/app.cpp source/texture_settings_screen.cpp source/texture_browser_screen.cpp source/texture_preview_view.cpp
+add_executable(TomoToolNXPlusBorealis source/main.cpp source/app.cpp source/texture_settings_screen.cpp source/texture_browser_screen.cpp source/profile_selector.cpp source/texture_preview_view.cpp
     source/texture_browser_session.cpp source/texture_read_source.cpp
     "${CMAKE_CURRENT_SOURCE_DIR}/../../source/ugc_names.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../source/texture_browser.cpp"

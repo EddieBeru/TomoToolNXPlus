@@ -56,7 +56,8 @@ There are two independent build targets during the migration:
 | `TomoToolNXPlusBorealis.nro` | Incremental Switch UI migration using Borealis's standard components and system themes |
 
 The Borealis target is **not yet a replacement for the full editor**. Textures now
-lists a selected account's real saved UGC content in read-only mode, with optional
+shows the native Switch profile selector at startup, then lists the confirmed
+account's real saved UGC content in read-only mode, with optional
 names and detail previews. Mii, Player and Map still contain sample data. Texture
 Settings edits canvas shape, encoder, BC1 mode, image fit and background as drafts,
 with explicit saving and discard choices.
