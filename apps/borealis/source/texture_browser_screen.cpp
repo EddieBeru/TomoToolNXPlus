@@ -1,5 +1,7 @@
 #include "texture_browser_screen.hpp"
 #include "exit_menu.hpp"
+#include "profile_header.hpp"
+#include "screen_activity.hpp"
 #include "texture_preview_view.hpp"
 #include "texture_settings_screen.hpp"
 #include "texture_settings_store.h"
@@ -11,7 +13,7 @@ using namespace TextureBrowser;
 std::string tr(const std::string& key){return brls::getStr("app/browser_"+key);}
 std::string errorMessage(Error e) {
     switch(e){
-    case Error::AccountService:return tr("accounts_error");
+    case Error::AccountService:return brls::getStr("app/profile_not_selected");
     case Error::NoSave:return tr("no_save");
     case Error::Metadata:case Error::Open:return tr("access_error");
     case Error::UgcMissing:return tr("missing");
@@ -48,10 +50,11 @@ class DetailScreen:public brls::AppletFrame {
     bool busy=false;
     std::function<void()> requestExit;
 public:
-    DetailScreen(std::shared_ptr<Session> session,Entry entry,std::function<void()> returned,std::function<void()> exit):
+    DetailScreen(std::shared_ptr<Session> session,Entry entry,std::function<void()> returned,std::function<void()> exit,const ProfileSelection& profile):
         AppletFrame(new brls::ScrollingFrame()),life(std::make_shared<Life>(Life{this})),
         session(std::move(session)),entry(std::move(entry)),returned(std::move(returned)),requestExit(std::move(exit)) {
         setTitle(tr("detail"));
+        addProfileHeader(this,profile);
         auto* box=new brls::Box(brls::Axis::COLUMN);box->setPadding(20,28,20,28);
         static_cast<brls::ScrollingFrame*>(getContentView())->setContentView(box);
         label(box,this->entry.name);label(box,this->entry.id.stem);
@@ -96,21 +99,28 @@ TextureBrowserScreen::TextureBrowserScreen(std::shared_ptr<Session> session,std:
     list->setPadding(24,28,24,28);setContentView(list);setGrow(1);
     auto* header=new brls::Header();header->setTitle("app/textures"_i18n);list->addView(header);
     label(list,tr("note"));
-    accountControl=action(list,tr("choose"),[this]{choose();});
     refreshControl=action(list,tr("refresh"),[this]{refresh();});
-    action(list,"app/settings"_i18n,[this]{
+    settingsControl=action(list,"app/settings"_i18n,[this]{
         model.context.scroll=getContentOffsetY();
-        brls::Application::pushActivity(new brls::Activity(createTextureSettingsScreen(TextureSettings::ConfigPath,requestExit)));
+        brls::Application::pushActivity(new ScreenActivity(
+            createTextureSettingsScreen(TextureSettings::ConfigPath,requestExit,profile)),
+            brls::TransitionAnimation::NONE);
     });
-    status=label(list,tr("choose"));
+    status=label(list,tr("choose_global"));
     entries=new brls::Box(brls::Axis::COLUMN);list->addView(entries);
     action(list,"app/tabs"_i18n,tabs);
     registerAction("app/tabs_hint"_i18n,brls::BUTTON_B,[tabs](brls::View*){tabs();return true;});
 }
 TextureBrowserScreen::~TextureBrowserScreen(){life->view=nullptr;session->cancel();}
-void TextureBrowserScreen::setInitialProfile(Account account){
-    if(!account.key.valid())return;
-    model.select(std::move(account));initialLoad=true;
+void TextureBrowserScreen::setProfile(const ProfileSelection& selection){
+    if(selection.state!=ProfileSelectionState::Selected || !selection.account.key.valid())return;
+    profile=selection;
+    if(model.hasAccount && model.context.account.key==selection.account.key){
+        model.context.account=selection.account;
+        return;
+    }
+    session->cancel();
+    model.select(selection.account);initialLoad=true;dirty=true;
 }
 void TextureBrowserScreen::activateBrowser(){
     active=true;
@@ -128,36 +138,6 @@ void TextureBrowserScreen::willAppear(bool resetState){
 }
 void TextureBrowserScreen::willDisappear(bool resetState){
     deactivateBrowser();brls::ScrollingFrame::willDisappear(resetState);
-}
-void TextureBrowserScreen::choose(){
-    if(model.state==State::AccountsLoading)return;
-    if(model.state==State::CatalogLoading)model.suspend();
-    model.chooseAccounts();status->setText(tr("loading"));
-    std::weak_ptr<Life> weak=life;
-    session->submit([weak](ReadSource& source,const Cancel& cancel){
-        auto result=source.accounts(cancel);
-        return [weak,result=std::move(result)]{
-            auto locked=weak.lock();if(!locked || !locked->view)return;
-            auto* self=locked->view;self->model.cancelChooser();
-            if(!result){self->status->setText(errorMessage(result.status.error));return;}
-            if(result.value.empty()){self->status->setText(tr("no_accounts"));return;}
-            auto* dialog=new brls::Dialog(tr("choose"));
-            dialog->addButton("hints/cancel"_i18n,[weak]{
-                auto l=weak.lock();if(!l || !l->view)return;
-                l->view->dirty=true;
-            });
-            for(const auto& account:result.value){
-                auto name=account.name.empty()?tr("account"):account.name;
-                // Session-local ordinal disambiguates equal names without exposing the UID.
-                name+=" ("+std::to_string(account.ordinal)+")";
-                dialog->addButton(name,[weak,account]{
-                    auto l=weak.lock();if(!l || !l->view)return;
-                    l->view->model.select(account);l->view->refresh(false);
-                });
-            }
-            dialog->open();
-        };
-    });
 }
 void TextureBrowserScreen::refresh(bool begin){
     if(!model.hasAccount)return;
@@ -180,18 +160,16 @@ void TextureBrowserScreen::refresh(bool begin){
 void TextureBrowserScreen::render(){
     if(!active){dirty=true;return;}
     dirty=false;
-    const auto& account=model.context.account;
-    accountControl->setText(model.hasAccount?tr("change")+": "+(account.name.empty()?tr("account"):account.name)+(account.ordinal?" ("+std::to_string(account.ordinal)+")":""):tr("choose"));
     bool loading=model.state==State::CatalogLoading || model.state==State::AccountsLoading;
     refreshControl->setFocusable(model.hasAccount && !loading);
     refreshControl->setAlpha(model.hasAccount && !loading?1.0f:0.45f);
-    brls::Application::giveFocus(accountControl);
+    brls::Application::giveFocus(settingsControl);
     pendingFocus=nullptr;
     entries->clearViews();
     if(loading){status->setText(tr("loading"));return;}
     if(model.state==State::CatalogError){status->setText(errorMessage(model.status.error));return;}
     if(model.state==State::Empty){status->setText(tr("empty"));return;}
-    if(model.state!=State::Ready){status->setText(tr("choose"));return;}
+    if(model.state!=State::Ready){status->setText(tr("choose_global"));return;}
     status->setText(model.catalog.namesWarning?tr("names_warning"):tr("readonly"));
     auto selected=model.context.selectedStem;
     for(size_t i=0;i<model.catalog.entries.size();++i){
@@ -225,8 +203,8 @@ void TextureBrowserScreen::onLayout(){
 }
 void TextureBrowserScreen::openEntry(const Entry& entry){
     std::weak_ptr<Life> weak=life;
-    brls::Application::pushActivity(new brls::Activity(new DetailScreen(session,entry,[weak]{
+    brls::Application::pushActivity(new ScreenActivity(new DetailScreen(session,entry,[weak]{
         auto l=weak.lock();if(l && l->view)l->view->restore();
-    },requestExit)));
+    },requestExit,profile)));
 }
 }

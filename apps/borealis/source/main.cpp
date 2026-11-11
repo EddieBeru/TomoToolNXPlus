@@ -1,4 +1,5 @@
 #include "app.hpp"
+#include "screen_activity.hpp"
 #include "texture_read_source.hpp"
 
 #include <cstdlib>
@@ -12,11 +13,11 @@ int main()
     brls::Application::createWindow(brls::getStr("app/title"));
     brls::Application::setGlobalQuit(false);
     brls::Application::getPlatform()->exitToHomeMode(false);
-    const auto profile=borealis_app::selectStartupProfile();
+    const auto profile=borealis_app::selectNativeProfile();
     auto session=std::make_shared<TextureBrowser::Session>(TextureBrowser::createReadSource(),
         [](auto callback){brls::sync(callback);});
     bool closing=false;
-    brls::Application::pushActivity(new brls::Activity(borealis_app::createRoot(session,[&] {
+    brls::Application::pushActivity(new borealis_app::ScreenActivity(borealis_app::createRoot(session,[&] {
         if(closing)return;
         closing=true;session->stop();
         brls::Application::notify(brls::getStr("app/browser_closing"));

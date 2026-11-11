@@ -51,3 +51,6 @@ void pselUiSetAllowUserCreation(PselUiSettings*, bool);
 void pselUiSetNetworkServiceRequired(PselUiSettings*, bool);
 void pselUiSetSkipButtonEnabled(PselUiSettings*, bool);
 Result pselUiShow(PselUiSettings*, AccountUid*);
+
+Result accountProfileGetImageSize(AccountProfile*, u32*);
+Result accountProfileLoadImage(AccountProfile*, void*, size_t, u32*);

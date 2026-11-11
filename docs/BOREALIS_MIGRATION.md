@@ -157,3 +157,20 @@ light/dark themes, handheld/docked rendering, real account-save permissions and 
 latency target still require the [acceptance guide](../specs/001-browse-real-textures/quickstart.md).
 Its SC matrix distinguishes host evidence from pending physical acceptance. Do not call
 this a fully verified editor replacement or infer success from the task checkboxes.
+
+
+### Global identity and child-screen lifecycle — 2026-11-10
+
+Physical feedback confirmed native startup selection. The texture-local account dialog
+has been removed; the root header now owns the native change-profile action and shows
+the selected nickname/avatar. Detail/settings headers retain the same visible identity.
+The profile presentation replaces the default battery/time indicators in these frames.
+Save/Exit uses a full-width standard Button, rather than a DetailCell with a narrow title.
+
+ScreenActivity now forwards activity pause/resume to its view, because the pinned
+Borealis Activity implementation leaves those hooks empty. This suspends browser work
+behind child activities and prevents late root renders/focus changes during settings.
+Settings opens and returns without a fade, preventing two full screens from being
+blended. The browser's catalog/selection/scroll are retained through the pause.
+New portrait limits/failures are covered by the native adapter host tests. Physical
+profile changes, portrait/button layout and the revised transition still require retesting.

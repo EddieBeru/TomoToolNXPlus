@@ -87,5 +87,6 @@ complements these checks. Physical acceptance remains pending: see
 
 The same runner also executes profile_selector_test.cpp against the host libnx shim:
 selection/UID handoff, skip, setup/show errors, offline/no-creation settings and nickname
-lookup failures with balanced cleanup. It does not launch a real system applet.
+lookup failures with balanced cleanup, and bounded avatar reads including load failure,
+oversize and invalid returned lengths. It does not launch a real system applet.
 See [startup behavior and physical checks](../docs/PROFILE_SELECTION.md).

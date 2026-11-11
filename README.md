@@ -58,7 +58,9 @@ There are two independent build targets during the migration:
 The Borealis target is **not yet a replacement for the full editor**. Textures now
 shows the native Switch profile selector at startup, then lists the confirmed
 account's real saved UGC content in read-only mode, with optional
-names and detail previews. Mii, Player and Map still contain sample data. Texture
+names and detail previews. The global header shows the current profile and photo;
+activate it to change accounts using the native selector. Mii, Player and Map still
+contain sample data. Texture
 Settings edits canvas shape, encoder, BC1 mode, image fit and background as drafts,
 with explicit saving and discard choices. Plus and the sidebar’s Save/Exit control
 provide a return to the homebrew loader, after pending reads finish.

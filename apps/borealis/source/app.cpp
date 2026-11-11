@@ -1,4 +1,6 @@
+#include "app_chrome.hpp"
 #include "app.hpp"
+#include "profile_header.hpp"
 #include "exit_menu.hpp"
 #include "texture_browser_screen.hpp"
 #include "texture_settings_screen.hpp"
@@ -58,7 +60,7 @@ brls::DetailCell* addAction(brls::Box* list, const std::string& text,
 class Navigation : public brls::Box
 {
 public:
-    Navigation(std::shared_ptr<TextureBrowser::Session> session, std::function<void()> exit, const ProfileSelection& profile) : Box(brls::Axis::ROW)
+    Navigation(std::shared_ptr<TextureBrowser::Session> session, std::function<void()> exit, const ProfileSelection& profile) : Box(brls::Axis::ROW), selectedProfile(profile)
     {
         sidebar = new brls::Sidebar();
         sidebar->setWidth(brls::Application::getStyle()["brls/tab_frame/sidebar_width"]);
@@ -66,7 +68,21 @@ public:
         sidebarPanel->setWidth(brls::Application::getStyle()["brls/tab_frame/sidebar_width"]);
         sidebar->setGrow(1);
         sidebarPanel->addView(sidebar);
-        addAction(sidebarPanel,"app/exit_menu"_i18n,"",[exit](brls::View*){showExitMenu(exit);});
+        auto* actions=new brls::Box(brls::Axis::COLUMN);
+        actions->setPadding(12,16,16,16);
+        actions->setShrink(0);
+        auto* exitButton=new brls::Button();
+        exitButton->setText("app/exit_menu"_i18n);
+        exitButton->setFontSize(20);
+        auto* exitLabel=static_cast<brls::Label*>(exitButton->getView("brls/button/label"));
+        exitLabel->setSingleLine(false);
+        exitLabel->setLineHeight(1.1f);
+        exitButton->setHeight(72);
+        exitButton->setWidthPercentage(100);
+        exitButton->setShrink(0);
+        exitButton->registerClickAction([exit](brls::View*){showExitMenu(exit);return true;});
+        actions->addView(exitButton);
+        sidebarPanel->addView(actions);
         addView(sidebarPanel);
         content = new brls::Box(brls::Axis::COLUMN);
         content->setGrow(1.0f);
@@ -84,7 +100,7 @@ public:
             if(i==1) {
                 browser=new TextureBrowserScreen(session,[this]{focusSidebar();},exit);
                 if(profile.state==ProfileSelectionState::Selected)
-                    browser->setInitialProfile(profile.account);
+                    browser->setProfile(profile);
                 pages[i]=browser;
                 continue;
             }
@@ -127,6 +143,21 @@ public:
         }
     }
 
+    void setProfileControl(ProfileHeader* header) { profileControl=header; }
+    void changeProfile() {
+        browser->deactivateBrowser();
+        const auto candidate=selectNativeProfile();
+        if(candidate.state==ProfileSelectionState::Selected) {
+            selectedProfile=candidate;
+            browser->setProfile(selectedProfile);
+            profileControl->update(selectedProfile);
+        } else if(candidate.state==ProfileSelectionState::Failed) {
+            brls::Application::notify("app/profile_not_selected"_i18n);
+        }
+        if(active==1)browser->activateBrowser();
+        brls::Application::giveFocus(profileControl);
+    }
+
     ~Navigation() override
     {
         // The attached page belongs to content; detached tabs remain owned here.
@@ -139,7 +170,7 @@ private:
     void addSample(brls::Box* list, const std::string& name, const std::string& detail)
     {
         addAction(list, name, detail, [](brls::View*) {
-            auto* dialog = new brls::Dialog("app/sample_note"_i18n);
+            auto* dialog = makeDialog("app/sample_note"_i18n);
             dialog->addButton("hints/back"_i18n, [] {});
             dialog->open();
         });
@@ -170,6 +201,8 @@ private:
         brls::Application::giveFocus(sidebar->getItem(active));
     }
 
+    ProfileSelection selectedProfile;
+    ProfileHeader* profileControl=nullptr;
     TextureBrowserScreen* browser=nullptr;
     brls::Sidebar* sidebar;
     brls::Box* content;
@@ -180,7 +213,11 @@ private:
 
 brls::View* createRoot(std::shared_ptr<TextureBrowser::Session> session, std::function<void()> exit, const ProfileSelection& profile)
 {
-    auto* frame = new brls::AppletFrame(new Navigation(std::move(session),std::move(exit),profile));
+    auto* navigation=new Navigation(std::move(session),std::move(exit),profile);
+    auto* frame = new brls::AppletFrame(navigation);
+    auto* header=addProfileHeader(frame,profile,[navigation]{navigation->changeProfile();});
+    navigation->setProfileControl(header);
+    frame->setLastFocusedView(navigation);
     frame->setTitle("app/title"_i18n);
     // The app has an explicit focusable Exit control instead of a root B exit.
     frame->registerAction("", brls::BUTTON_B, [](brls::View*) { return true; }, true);

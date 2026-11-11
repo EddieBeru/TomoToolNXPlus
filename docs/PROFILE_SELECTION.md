@@ -7,9 +7,9 @@
 - Confirmed selection becomes the texture browser's initial account. Open Textures and
   load that account through the existing read-only workflow, without asking again.
 - Skipping/cancelling does not choose an arbitrary account, mount a save or close the app.
-  Keep the existing Choose account control available in Textures.
+  Keep the global header profile control available to choose an account.
 - If the applet cannot launch, keep the app usable and explain that the user can select
-  an account from Textures. A failed nickname lookup keeps the selected UID with a
+  an account from the header. A failed nickname lookup keeps the selected UID with a
   localized fallback name. Never use a nickname as identity or display/log the UID.
 - Existing Change account, preferences, controller/touch routes and read-only boundaries
   remain available. No save write, commit or backup is introduced.
@@ -29,3 +29,17 @@ against the installed libnx API. No physical Switch or native applet run was per
 B cancellation/result behavior and input/focus restoration still require console checks.
 The startup adapter passes only the confirmed account identity to the browser, with a
 bounded optional nickname. It never opens a game-save filesystem itself.
+
+
+## Hardware feedback update — 2026-11-10
+
+Startup selection was confirmed working by the user on physical Switch. Account changes
+now use that same native selector from the global header, not the removed Textures dialog.
+Name and an optional JPEG avatar are shown in root/detail/settings headers. Avatar reads
+are capped at 256 KiB, kept in memory, checked for failed or invalid-length reads and
+replaced by a neutral placeholder when unavailable. Changing the account invalidates old
+browser work; cancellation keeps the current profile/context. Child headers display their
+account without allowing a change behind an active editor.
+
+The global change/portrait layout and input handoff require a new hardware check; the
+prior startup result does not validate those new routes.

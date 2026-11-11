@@ -7,7 +7,8 @@ struct ProfileSelection {
     ProfileSelectionState state = ProfileSelectionState::Skipped;
     TextureBrowser::Account account;
     uint32_t platformResult = 0;
+    std::vector<uint8_t> avatarJpeg;
 };
 // The native library applet must run on the application thread, not the read worker.
-ProfileSelection selectStartupProfile();
+ProfileSelection selectNativeProfile();
 }

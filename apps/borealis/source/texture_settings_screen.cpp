@@ -1,5 +1,7 @@
+#include "app_chrome.hpp"
 #include "texture_settings_screen.hpp"
 #include "exit_menu.hpp"
+#include "profile_header.hpp"
 #include "texture_settings_store.h"
 
 #include <array>
@@ -12,9 +14,10 @@ using TextureSettings::Row;
 
 class SettingsScreen : public brls::AppletFrame {
 public:
-    SettingsScreen(const std::string& path, std::function<void()> exit)
+    SettingsScreen(const std::string& path, std::function<void()> exit, const ProfileSelection& profile)
         : AppletFrame(new brls::ScrollingFrame()), store(path), requestExit(std::move(exit)) {
         setTitle("app/settings"_i18n);
+        addProfileHeader(this,profile);
         auto* list = new brls::Box(brls::Axis::COLUMN);
         auto style = brls::Application::getStyle();
         list->setPadding(style["brls/sidebar/padding_top"], style["brls/sidebar/padding_right"],
@@ -30,7 +33,7 @@ public:
         list->addView(status);
         reloadControl = action(list, "preferences/reload"_i18n, [this] {
             if (ready && store.Dirty(state)) {
-                auto* dialog = new brls::Dialog("preferences/reload_confirm"_i18n);
+                auto* dialog = makeDialog("preferences/reload_confirm"_i18n);
                 dialog->addButton("hints/cancel"_i18n, [] {});
                 dialog->addButton("preferences/reload"_i18n, [this] { load(); });
                 dialog->open();
@@ -109,7 +112,7 @@ private:
         const int index = static_cast<int>(row);
         auto values = choices(row);
         const int selected = TextureSettings::ValueIndex(state, row);
-        auto* dropdown = new brls::Dropdown(rows[index]->title->getFullText(), values,
+        auto* dropdown = makeDropdown(rows[index]->title->getFullText(), values,
             [this, row](int value) {
                 // The extra custom-color choice preserves an existing color as-is.
                 if (TextureSettings::SelectValue(state, row, value)) {
@@ -168,7 +171,7 @@ private:
             if (result.mayHaveChanged) ready = false;
             status->setText(errorMessage(result));
             refresh();
-            auto* dialog = new brls::Dialog(errorMessage(result));
+            auto* dialog = makeDialog(errorMessage(result));
             dialog->addButton("hints/back"_i18n, [this] { brls::Application::giveFocus(reloadControl); });
             dialog->getAppletFrame()->registerAction("hints/back"_i18n, brls::BUTTON_B,
                 [this, dialog](brls::View*) {
@@ -182,13 +185,27 @@ private:
         brls::Application::notify("preferences/saved"_i18n);
         refresh();
         if (exitAfter) requestExit();
-        else if (returnAfter) brls::Application::popActivity();
+        else if (returnAfter) brls::Application::popActivity(brls::TransitionAnimation::NONE);
         else brls::Application::giveFocus(backControl);
     }
 
     void exitMenu() {
-        if(!ready || !store.Dirty(state)) {showExitMenu(requestExit);return;}
-        auto* dialog=new brls::Dialog("app/exit_dirty"_i18n);
+        showExitMenu([this]{confirmExit();}, [this] {
+            if(!ready) {
+                auto* dialog=makeDialog("app/save_unavailable"_i18n);
+                dialog->addButton("hints/back"_i18n,[]{});
+                dialog->open();
+            } else if(store.Dirty(state)) {
+                save(false);
+            } else {
+                brls::Application::notify("app/no_pending_changes"_i18n);
+            }
+        });
+    }
+
+    void confirmExit() {
+        if(!ready || !store.Dirty(state)) {requestExit();return;}
+        auto* dialog=makeDialog("app/exit_dirty"_i18n);
         dialog->addButton("preferences/keep_editing"_i18n,[]{});
         dialog->addButton("app/save_exit"_i18n,[this]{save(false,true);});
         dialog->addButton("app/discard_exit"_i18n,requestExit);
@@ -196,10 +213,10 @@ private:
     }
 
     void back() {
-        if (!ready || !store.Dirty(state)) { brls::Application::popActivity(); return; }
-        auto* dialog = new brls::Dialog("preferences/leave_confirm"_i18n);
+        if (!ready || !store.Dirty(state)) { brls::Application::popActivity(brls::TransitionAnimation::NONE); return; }
+        auto* dialog = makeDialog("preferences/leave_confirm"_i18n);
         dialog->addButton("preferences/save_return"_i18n, [this] { save(true); });
-        dialog->addButton("preferences/discard"_i18n, [] { brls::Application::popActivity(); });
+        dialog->addButton("preferences/discard"_i18n, [] { brls::Application::popActivity(brls::TransitionAnimation::NONE); });
         dialog->addButton("preferences/keep_editing"_i18n, [] {});
         dialog->open();
     }
@@ -215,7 +232,7 @@ private:
 };
 } // namespace
 
-brls::View* createTextureSettingsScreen(const std::string& configPath, std::function<void()> requestExit) {
-    return new SettingsScreen(configPath,std::move(requestExit));
+brls::View* createTextureSettingsScreen(const std::string& configPath, std::function<void()> requestExit, const ProfileSelection& profile) {
+    return new SettingsScreen(configPath,std::move(requestExit),profile);
 }
 } // namespace borealis_app
