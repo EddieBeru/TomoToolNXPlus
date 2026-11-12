@@ -40,3 +40,9 @@ data/webui_gz.bin
 
 # Temporary host validation files
 *.tmp
+
+# Verified local NRO recovery copies from DBI deployment
+.deploy-backups/
+
+# Host Python tooling
+__pycache__/

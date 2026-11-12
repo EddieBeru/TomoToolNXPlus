@@ -1,4 +1,5 @@
 #include "app_chrome.hpp"
+#include "navigation.hpp"
 #include "app.hpp"
 #include "profile_header.hpp"
 #include "exit_menu.hpp"
@@ -118,8 +119,7 @@ public:
             }
             addAction(list, "app/tabs"_i18n, "", [this](brls::View*) { focusSidebar(); });
             pages[i] = scroll(list);
-            pages[i]->registerAction("app/tabs_hint"_i18n, brls::BUTTON_B,
-                [this](brls::View*) { focusSidebar(); return true; }, false, false, brls::SOUND_BACK);
+            navigation::back(pages[i], [this] { focusSidebar(); }, "app/tabs_hint"_i18n);
         }
 
         if(profile.state==ProfileSelectionState::Selected)active=1;
@@ -128,15 +128,8 @@ public:
         {
             sidebar->addItem(names[i], [this, i](brls::View*) { activate(i); });
             // B at the root tab selector has no unrelated action or exit dialog.
-            sidebar->getItem(i)->registerAction("", brls::BUTTON_B,
-                [](brls::View*) { return true; }, true);
+            navigation::root(sidebar->getItem(i));
         }
-        registerAction("app/exit_menu"_i18n,brls::BUTTON_START,
-            [exit](brls::View*){showExitMenu(exit);return true;});
-        registerAction("app/previous_tab"_i18n, brls::BUTTON_LT,
-            [this](brls::View*) { switchTab(-1); return true; });
-        registerAction("app/next_tab"_i18n, brls::BUTTON_RT,
-            [this](brls::View*) { switchTab(1); return true; });
         if(profile.state==ProfileSelectionState::Selected) {
             brls::Application::giveFocus(sidebar->getItem(active));
             brls::Application::giveFocus(pages[active]);
@@ -144,6 +137,11 @@ public:
     }
 
     void setProfileControl(ProfileHeader* header) { profileControl=header; }
+    void bindRootScope(brls::View* frame, const std::function<void()>& exit) {
+        navigation::root(frame);
+        navigation::saveExit(frame, [exit] { showExitMenu(exit); });
+        navigation::tabs(frame, [this](int direction) { switchTab(direction); });
+    }
     void changeProfile() {
         browser->deactivateBrowser();
         const auto candidate=selectNativeProfile();
@@ -213,14 +211,14 @@ private:
 
 brls::View* createRoot(std::shared_ptr<TextureBrowser::Session> session, std::function<void()> exit, const ProfileSelection& profile)
 {
-    auto* navigation=new Navigation(std::move(session),std::move(exit),profile);
+    auto* navigation=new Navigation(std::move(session),exit,profile);
     auto* frame = new brls::AppletFrame(navigation);
     auto* header=addProfileHeader(frame,profile,[navigation]{navigation->changeProfile();});
     navigation->setProfileControl(header);
     frame->setLastFocusedView(navigation);
     frame->setTitle("app/title"_i18n);
     // The app has an explicit focusable Exit control instead of a root B exit.
-    frame->registerAction("", brls::BUTTON_B, [](brls::View*) { return true; }, true);
+    navigation->bindRootScope(frame,exit);
     return frame;
 }
 } // namespace borealis_app

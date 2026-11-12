@@ -221,6 +221,15 @@ endif
 all: $(BUILD)
 
 .PHONY: borealis borealis-clean borealis-prototype borealis-prototype-clean
+.PHONY: deploy-borealis deploy-sdl
+
+DEPLOY_ARGS ?=
+
+deploy-borealis: borealis
+	@/usr/bin/python3 tools/deploy_switch.py $(DEPLOY_ARGS)
+
+deploy-sdl: all
+	@/usr/bin/python3 tools/deploy_switch.py --source "$(TOPDIR)/TomoToolNXPlus.nro" $(DEPLOY_ARGS)
 
 # Separate Switch UI port; the default SDL build remains available.
 borealis:

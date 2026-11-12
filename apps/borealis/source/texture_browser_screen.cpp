@@ -1,7 +1,7 @@
 #include "texture_browser_screen.hpp"
 #include "exit_menu.hpp"
 #include "profile_header.hpp"
-#include "screen_activity.hpp"
+#include "navigation.hpp"
 #include "texture_preview_view.hpp"
 #include "texture_settings_screen.hpp"
 #include "texture_settings_store.h"
@@ -46,6 +46,7 @@ class DetailScreen:public brls::AppletFrame {
     brls::Label* status;
     TexturePreviewView* image;
     brls::DetailCell* retry;
+    brls::DetailCell* backControl;
     std::function<void()> returned;
     bool busy=false;
     std::function<void()> requestExit;
@@ -56,24 +57,30 @@ public:
         setTitle(tr("detail"));
         addProfileHeader(this,profile);
         auto* box=new brls::Box(brls::Axis::COLUMN);box->setPadding(20,28,20,28);
-        static_cast<brls::ScrollingFrame*>(getContentView())->setContentView(box);
+        auto* scrolling=static_cast<brls::ScrollingFrame*>(getContentView());
+        scrolling->setScrollingBehavior(brls::ScrollingBehavior::CENTERED);
+        scrolling->setContentView(box);
         label(box,this->entry.name);label(box,this->entry.id.stem);
         status=label(box,tr("loading"));
-        image=new TexturePreviewView();box->addView(image);
+        backControl=action(box,"hints/back"_i18n,[this]{back();});
         retry=action(box,tr("refresh"),[this]{load();});
         action(box,"app/exit_menu"_i18n,[this]{showExitMenu(requestExit);});
-        registerAction("app/exit_menu"_i18n,brls::BUTTON_START,
-            [this](brls::View*){showExitMenu(requestExit);return true;});
-        action(box,"hints/back"_i18n,[this]{back();});
-        registerAction("hints/back"_i18n,brls::BUTTON_B,[this](brls::View*){back();return true;});
+        navigation::saveExit(this, [this] { showExitMenu(requestExit); });
+        navigation::back(this, [this] { back(); });
+        image=new TexturePreviewView();box->addView(image);
+        // The initial target must remain available while preview loading disables Retry.
+        setLastFocusedView(backControl);
+        box->setLastFocusedView(backControl);
         load();
     }
     ~DetailScreen() override {life->view=nullptr;session->cancel();}
 private:
-    void back(){session->cancel();returned();brls::Application::popActivity();}
+    void back(){session->cancel();returned();navigation::pop();}
     void load(){
         if(busy)return;
         busy=true;image->clear();status->setText(tr("loading"));
+        if(navigation::contains(retry,brls::Application::getCurrentFocus()))
+            navigation::focus(this,backControl);
         retry->setFocusable(false);retry->setAlpha(0.45f);
         std::weak_ptr<Life> weak=life;auto selected=entry;
         session->submit([weak,selected](ReadSource& source,const Cancel& cancel){
@@ -102,14 +109,12 @@ TextureBrowserScreen::TextureBrowserScreen(std::shared_ptr<Session> session,std:
     refreshControl=action(list,tr("refresh"),[this]{refresh();});
     settingsControl=action(list,"app/settings"_i18n,[this]{
         model.context.scroll=getContentOffsetY();
-        brls::Application::pushActivity(new ScreenActivity(
-            createTextureSettingsScreen(TextureSettings::ConfigPath,requestExit,profile)),
-            brls::TransitionAnimation::NONE);
+        navigation::push(createTextureSettingsScreen(TextureSettings::ConfigPath,requestExit,profile));
     });
     status=label(list,tr("choose_global"));
     entries=new brls::Box(brls::Axis::COLUMN);list->addView(entries);
     action(list,"app/tabs"_i18n,tabs);
-    registerAction("app/tabs_hint"_i18n,brls::BUTTON_B,[tabs](brls::View*){tabs();return true;});
+    navigation::back(this, tabs, "app/tabs_hint"_i18n);
 }
 TextureBrowserScreen::~TextureBrowserScreen(){life->view=nullptr;session->cancel();}
 void TextureBrowserScreen::setProfile(const ProfileSelection& selection){
@@ -163,7 +168,7 @@ void TextureBrowserScreen::render(){
     bool loading=model.state==State::CatalogLoading || model.state==State::AccountsLoading;
     refreshControl->setFocusable(model.hasAccount && !loading);
     refreshControl->setAlpha(model.hasAccount && !loading?1.0f:0.45f);
-    brls::Application::giveFocus(settingsControl);
+    navigation::focus(this,settingsControl);
     pendingFocus=nullptr;
     entries->clearViews();
     if(loading){status->setText(tr("loading"));return;}
@@ -193,9 +198,9 @@ void TextureBrowserScreen::render(){
 void TextureBrowserScreen::restore(){restorePending=true;invalidate();}
 void TextureBrowserScreen::onLayout(){
     brls::ScrollingFrame::onLayout();
-    if(restorePending && active){
+    if(restorePending && active && navigation::isActive(this)){
         restorePending=false;
-        if(pendingFocus){brls::Application::giveFocus(pendingFocus);pendingFocus=nullptr;}
+        if(pendingFocus){navigation::focus(this,pendingFocus);pendingFocus=nullptr;}
         auto offset=std::max(0.0f,model.context.scroll);
         offset=std::min(offset,std::max(0.0f,list->getHeight()-getHeight()));
         setContentOffsetY(offset,false);
@@ -203,8 +208,8 @@ void TextureBrowserScreen::onLayout(){
 }
 void TextureBrowserScreen::openEntry(const Entry& entry){
     std::weak_ptr<Life> weak=life;
-    brls::Application::pushActivity(new ScreenActivity(new DetailScreen(session,entry,[weak]{
+    navigation::push(new DetailScreen(session,entry,[weak]{
         auto l=weak.lock();if(l && l->view)l->view->restore();
-    },requestExit,profile)));
+    },requestExit,profile));
 }
 }

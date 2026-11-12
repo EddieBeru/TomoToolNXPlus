@@ -90,3 +90,74 @@ selection/UID handoff, skip, setup/show errors, offline/no-creation settings and
 lookup failures with balanced cleanup, and bounded avatar reads including load failure,
 oversize and invalid returned lengths. It does not launch a real system applet.
 See [startup behavior and physical checks](../docs/PROFILE_SELECTION.md).
+
+## DBI MTP deployment helper
+
+```sh
+/usr/bin/python3 tests/deploy_switch_test.py
+```
+
+Twenty-four tests use temporary synthetic files and local GIO operations to verify
+update decisions, dry runs, NRO validation, path restrictions, symlinks, missing
+metadata, transfer/readback failures, storage discovery, forbidden destinations,
+verified backups, capacity checks and preflight changes. Requires the system
+Python with PyGObject/GIO. No USB device is used; real DBI timestamp and transfer
+behavior remain unverified. See [deployment workflow](../docs/DEPLOY_SWITCH.md).
+
+## Borealis focus scope ownership
+
+```sh
+g++ -std=c++17 -Wall -Wextra -Werror \
+    -Itests/support/borealis_navigation -Iapps/borealis/source \
+    tests/borealis_navigation_focus_test.cpp -o /tmp/tomotool-navigation-focus-test
+/tmp/tomotool-navigation-focus-test
+```
+
+Runs the shared focus guard against a host hierarchy/activity model: background
+restore attempts, child entry, modal isolation, invalid default targets and parent
+restoration. The shim is never included in Switch builds. This does not render
+Borealis or validate Joy-Con/touch behavior on the device.
+
+## Texture preview display bounds
+
+```sh
+g++ -std=c++17 -Wall -Wextra -Werror -Iapps/borealis/source \
+    tests/texture_preview_layout_test.cpp -o /tmp/tomotool-preview-layout-test
+/tmp/tomotool-preview-layout-test
+```
+
+Checks the production fit calculation for square, portrait, landscape and narrow
+viewports, preserving proportions and keeping the drawn rectangle within the
+viewport; rejects empty/nonfinite dimensions. This does not execute NanoVG or
+verify physical controller/touch scrolling.
+
+## Borealis shortcut registration
+
+```sh
+g++ -std=c++17 -Wall -Wextra -Werror \
+    -Itests/support/borealis_navigation -Iapps/borealis/source \
+    apps/borealis/source/navigation.cpp tests/borealis_navigation_actions_test.cpp \
+    -o /tmp/tomotool-navigation-actions-test
+/tmp/tomotool-navigation-actions-test
+```
+
+Compiles the production navigation implementation against the host shim. Verifies
+Plus menu callbacks from root content, profile header and child content; B root
+suppression/child Back; ZL/ZR tab callbacks; nonrepeating actions; modal hierarchy
+isolation and the shared footer factory's visibility policy. The test rejects the
+previous helper named `bind`, whose unqualified calls could select `std::bind`
+and discard the resulting object instead of registering actions. This models
+registration/dispatch, not physical input polling or actual rendered widgets.
+
+## KDE MTP transport and deployment
+
+```sh
+/usr/bin/python3 tests/kde_mtp_test.py
+```
+
+Exercises the KDE workflow and FD transport adapter using synthetic files and
+fake D-Bus/storage endpoints. Checks date policy and explicit undated replacement,
+identical/missing targets, dry runs, backup verification, disconnects, preflight
+changes, capacity, upload/readback errors, restricted paths, and opening the
+source before deletion. Live USB behavior is separate evidence; see
+[deployment workflow](../docs/DEPLOY_SWITCH.md).

@@ -1,5 +1,5 @@
 #include "app.hpp"
-#include "screen_activity.hpp"
+#include "navigation.hpp"
 #include "texture_read_source.hpp"
 
 #include <cstdlib>
@@ -11,17 +11,18 @@ int main()
         return EXIT_FAILURE;
 
     brls::Application::createWindow(brls::getStr("app/title"));
+    borealis_app::navigation::initialize();
     brls::Application::setGlobalQuit(false);
     brls::Application::getPlatform()->exitToHomeMode(false);
     const auto profile=borealis_app::selectNativeProfile();
     auto session=std::make_shared<TextureBrowser::Session>(TextureBrowser::createReadSource(),
         [](auto callback){brls::sync(callback);});
     bool closing=false;
-    brls::Application::pushActivity(new borealis_app::ScreenActivity(borealis_app::createRoot(session,[&] {
+    borealis_app::navigation::push(borealis_app::createRoot(session,[&] {
         if(closing)return;
         closing=true;session->stop();
         brls::Application::notify(brls::getStr("app/browser_closing"));
-    },profile)));
+    },profile));
 
     if(profile.state==borealis_app::ProfileSelectionState::Failed)
         brls::Application::notify(brls::getStr("app/profile_not_selected"));

@@ -113,6 +113,13 @@ it through the homebrew menu on a homebrew-capable Switch. Both targets identify
 EddieBeru as the fork author. Existing SD paths retain the TomoToolNX name for
 configuration and backup continuity.
 
+For USB deployment through DBI's MTP responder on Linux, connect through KDE
+or GVfs and run `make -j4 deploy-borealis` (or `make -j4 deploy-sdl`). The helper
+waits for the SD card, verifies recovery copies and uploaded bytes, and normally
+updates only a missing or older executable. DBI targets with no usable date
+require the explicit `DEPLOY_ARGS='--replace-undated'` option. See [deployment options and checks](docs/DEPLOY_SWITCH.md),
+including dry runs and interrupted-transfer recovery.
+
 This fork's builds and status are separate from upstream releases. The legacy
 editor's update checker currently points to upstream; it does not track this
 fork's releases.

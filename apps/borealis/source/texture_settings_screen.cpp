@@ -1,4 +1,5 @@
 #include "app_chrome.hpp"
+#include "navigation.hpp"
 #include "texture_settings_screen.hpp"
 #include "exit_menu.hpp"
 #include "profile_header.hpp"
@@ -55,13 +56,11 @@ public:
         saveControl = action(list, "preferences/save"_i18n, [this] { save(false); });
         if(requestExit) {
             action(list,"app/exit_menu"_i18n,[this]{exitMenu();});
-            registerAction("app/exit_menu"_i18n,brls::BUTTON_START,
-                [this](brls::View*){exitMenu();return true;});
+            navigation::saveExit(this, [this] { exitMenu(); });
         }
         backControl = action(list, "hints/back"_i18n, [this] { back(); });
         static_cast<brls::ScrollingFrame*>(getContentView())->setContentView(list);
-        registerAction("hints/back"_i18n, brls::BUTTON_B,
-            [this](brls::View*) { back(); return true; }, false, false, brls::SOUND_BACK);
+        navigation::back(this, [this] { back(); });
         list->setLastFocusedView(rows[0]);
         load(false);
     }
@@ -120,7 +119,7 @@ private:
                     refresh();
                 }
             }, selected < 0 ? static_cast<int>(values.size()) - 1 : selected);
-        brls::Application::pushActivity(new brls::Activity(dropdown));
+        navigation::push(dropdown);
     }
 
     void refresh() {
@@ -173,11 +172,9 @@ private:
             refresh();
             auto* dialog = makeDialog(errorMessage(result));
             dialog->addButton("hints/back"_i18n, [this] { brls::Application::giveFocus(reloadControl); });
-            dialog->getAppletFrame()->registerAction("hints/back"_i18n, brls::BUTTON_B,
-                [this, dialog](brls::View*) {
-                    dialog->close([this] { brls::Application::giveFocus(reloadControl); });
-                    return true;
-                }, false, false, brls::SOUND_BACK);
+            navigation::back(dialog->getAppletFrame(), [this, dialog] {
+                dialog->close([this] { brls::Application::giveFocus(reloadControl); });
+            });
             dialog->open();
             return;
         }
@@ -185,7 +182,7 @@ private:
         brls::Application::notify("preferences/saved"_i18n);
         refresh();
         if (exitAfter) requestExit();
-        else if (returnAfter) brls::Application::popActivity(brls::TransitionAnimation::NONE);
+        else if (returnAfter) navigation::pop();
         else brls::Application::giveFocus(backControl);
     }
 
@@ -213,10 +210,10 @@ private:
     }
 
     void back() {
-        if (!ready || !store.Dirty(state)) { brls::Application::popActivity(brls::TransitionAnimation::NONE); return; }
+        if (!ready || !store.Dirty(state)) { navigation::pop(); return; }
         auto* dialog = makeDialog("preferences/leave_confirm"_i18n);
         dialog->addButton("preferences/save_return"_i18n, [this] { save(true); });
-        dialog->addButton("preferences/discard"_i18n, [] { brls::Application::popActivity(brls::TransitionAnimation::NONE); });
+        dialog->addButton("preferences/discard"_i18n, [] { navigation::pop(); });
         dialog->addButton("preferences/keep_editing"_i18n, [] {});
         dialog->open();
     }

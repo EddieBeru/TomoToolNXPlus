@@ -7,8 +7,21 @@ already meet these requirements. Save-integrity rules in `AGENTS.md` take priori
 ## Controller and Joy-Con navigation
 
 The target is one global navigation system, replacing separate button bindings
-for individual actions. Its implementation is a planned major feature; the
-following rules guide new work and incremental migration of existing screens.
+for individual actions. Borealis uses `apps/borealis/source/navigation.hpp` for
+shared bindings, screen transitions, and footer policy. The following rules guide
+new work and incremental migration of remaining screens, including the SDL UI.
+
+- Initialize the Borealis navigation module after `Application::createWindow()` and
+  before creating views. Its `brls:BottomBar` factory applies to all frames and
+  library overlays: contextual hints share the standard footer geometry without
+  a clock, battery, or wireless indicator. Do not hide widgets per screen.
+- Screens supply Back and Save/Exit callbacks through the shared module; keep
+  draft validation and write rules in the responsible workflow. Use its push/pop
+  operations for child screens to preserve lifecycle and parent focus restoration.
+- Register top-level bindings on the root frame so they cover header focus too.
+  Dialogs and dropdowns own their modal focus and Back behavior; root shortcuts
+  must not reach through them. Child activities expose only their own available
+  actions. Screen transitions are immediate; overlay animations remain Borealis-owned.
 
 | Input | Global meaning |
 | --- | --- |

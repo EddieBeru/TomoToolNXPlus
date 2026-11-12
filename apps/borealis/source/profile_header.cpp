@@ -1,5 +1,4 @@
 #include "profile_header.hpp"
-#include "app_chrome.hpp"
 
 namespace borealis_app {
 ProfileHeader::ProfileHeader(const ProfileSelection& profile, std::function<void()> change)
@@ -63,7 +62,6 @@ ProfileHeader* addProfileHeader(brls::AppletFrame* frame, const ProfileSelection
     auto* header = static_cast<brls::Box*>(frame->getView("brls/applet_frame/hint_box"));
     auto* badge = new ProfileHeader(profile, std::move(change));
     header->addView(badge);
-    hideStatusWidgets(frame);
     return badge;
 }
 }
