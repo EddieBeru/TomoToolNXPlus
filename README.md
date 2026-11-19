@@ -74,20 +74,27 @@ does not edit or commit game saves. WebUI remains outside this Switch UI migrati
 Earlier Plus builds have user-reported success on real Switch hardware. The new
 Borealis v0.2.0 preference workflow has host regression and adapted-emulator
 checks; its physical SD/configuration behavior still needs hardware validation.
-The new read-only texture browser has host tests and cross-build evidence, but no
-emulator or physical Switch validation yet. Existing legacy code has not all been
-brought up to the fork's development rules.
+The read-only texture browser has host tests and cross-build evidence. Physical
+retests confirmed startup selection, focus/footer fixes, Plus and preview rendering
+and controller reachability; [the hardware record](docs/HARDWARE_UI_FEEDBACK.md)
+details their scope. Full acceptance and latency measurements remain pending.
+Existing legacy code has not all been brought up to the fork's development rules.
 
-See [the Borealis port record](docs/BOREALIS_PORT.md),
+See [the project roadmap and capability inventory](docs/ROADMAP.md),
+[the Borealis port record](docs/BOREALIS_PORT.md),
 [migration boundaries and recovery](docs/BOREALIS_MIGRATION.md), and
 [host regression checks](tests/README.md) for scope and evidence.
 
 ## Where it is going
 
-1. Complete functional screens in small, independently reviewable steps.
-2. Validate the real read-only texture browser on physical Switch hardware.
-3. Connect texture operations through shared validation, backup and save workflows.
-4. Migrate the remaining Switch screens while reducing main.cpp's responsibilities.
+The migration follows a **read-only-first** milestone path tracked in
+[docs/ROADMAP.md](docs/ROADMAP.md):
+
+1. **M0 — Foundation & Read-Only Textures**: Validate the real read-only texture browser and preferences workflow on physical Switch hardware.
+2. **M1–M3 — Read-Only Parity Across Tabs**: Bring `Player`, `Mii` and `Map` (including its dedicated NanoVG view) to real read-only save data before enabling writes.
+3. **M4 — Backup & Save Integrity Gate**: Connect verified per-user backups, restore workflows and write validation in Borealis.
+4. **M5–M7 — Shared Write Workflows**: Enable texture mutations, `Player`/`Mii` editing, ShareMii, map editing, bundles and the Island Generator through shared domain services.
+5. **M8 — WebUI/MTP Lifecycle & Legacy Retirement**: Integrate WebUI/MTP controls into Borealis and retire the legacy SDL interface in `source/main.cpp`.
 
 Standard controls become Borealis components. Image previews reuse decoded
 pixels with resources owned by the new renderer. Maps and custom canvases need
