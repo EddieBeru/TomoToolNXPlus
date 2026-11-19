@@ -40,5 +40,13 @@ int main(){
     assert(!loadCatalog(source,{{1,0}},no));source.failure={};
     assert(snapshot==source.accountFiles);
     for(const auto& op:source.operations)assert(op=="read" || op=="open-read" || op=="close");
+    source.files=Fixtures::collection(1);
+    source.files["/Ugc/UgcFood000_Thumb_ugctex.zs"]={};
+    source.files["/Ugc/ugcfood000_THUMB_UGCTEX.ZS"]={};
+    source.accountFiles.clear();
+    auto ambiguous=loadCatalog(source,{{1,0}},no);
+    assert(ambiguous && ambiguous.value.namesWarning);
+    assert(ambiguous.value.entries.size()==1 && ambiguous.value.entries[0].associationWarning);
+    assert(ambiguous.value.entries[0].thumbRef.empty() && !ambiguous.value.entries[0].mainRef.empty());
     std::cout<<"texture browser: OK\n";
 }

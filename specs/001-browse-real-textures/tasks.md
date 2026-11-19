@@ -135,7 +135,7 @@ control y touch por separado y alternados.
 
 **Purpose**: Demostrar preservación, integración y resultados reales, diferenciando plataformas.
 
-- [ ] T040 Completar SC-006 integrado en tests/texture_browser_session_test.cpp y tests/texture_read_source_test.cpp sobre cuenta/catálogo/preview/refresh/retry/error/cancelación/salida: inventario y bytes idénticos, cero intentos de write/create/delete/rename/commit y ningún cruce A/B, log personal o persistencia de contexto/imágenes.
+- [X] T040 Completar SC-006 integrado en tests/texture_browser_session_test.cpp y tests/texture_read_source_test.cpp sobre cuenta/catálogo/preview/refresh/retry/error/cancelación/salida: inventario y bytes idénticos, cero intentos de write/create/delete/rename/commit y ningún cruce A/B, log personal o persistencia de contexto/imágenes.
 - [X] T041 Ejecutar tests nuevos y existentes settings/config/save safety, repetir nuevos con ASan/UBSan y documentar comandos finales/resultados en tests/README.md y specs/001-browse-real-textures/quickstart.md, incluyendo tests/ugc_scanner_test.cpp y equivalencia de extracción; ajustar comandos a dependencias reales sin pruebas extra ajenas al riesgo.
 - [X] T042 Ejecutar make -j4 y make -j4 borealis, auditar adaptador/call paths y build/borealis/TomoToolNXPlusBorealis.map y registrar evidencia en docs/BOREALIS_MIGRATION.md: sin SaveMount/MiiManager/SaveWorkflow/HTTP/escritores de TextureProcessor alcanzables desde navegador; ConfigStore conserva sus escrituras explícitas separadas, sin exigir ausencia global de símbolos write.
 - [ ] T043 Verificar SC-002/SC-007 según docs/UI_GUIDELINES.md y registrar matriz en docs/BOREALIS_MIGRATION.md: todas las acciones solo control y solo touch, foco/modales/held input/scroll/contexto, tres idiomas con fallback inglés, ambos temas, 1280×720 y dock, nombres largos/estados y borrador/Save/Discard de Texture Settings; distinguir pruebas físicas pendientes.
@@ -225,3 +225,36 @@ No emulator or physical Switch was available for this run. T023/T031/T039/T043/T
 remain open for their UI/hardware acceptance portions. T040 remains open for the complete
 end-to-end acceptance matrix; synthetic snapshots, source flags and cancellation tests
 already pass on host. No personal save was accessed and no commit was created.
+
+
+## Phase 7: Convergence
+
+- [X] T046 HIGH Integrar sesión, catálogo, preview y adaptador real con shim; recorrer carga, refresh, retry, error, cancelación, cambio A/B y salida, comprobando inventario/bytes idénticos, cero mutaciones y ausencia de entregas cruzadas en tests/texture_browser_integration_test.cpp per FR-011/012, SC-006, T040 (partial).
+- [X] T047 HIGH Completar lecturas parciales acumulables, cierres ordenados ante fallos, índices de nombres duplicados, canvas cuadrado y retry/cancelación asíncronos; sincronizar worker determinísticamente en tests/ per T006/010/013/017/025/032 (partial).
+- [ ] T048 HIGH Completar y registrar cada caso aprobado/fallido/pendiente de cuentas, recuperación, control/touch independientes, 20 ciclos detalle/volver, 10 cambios de pestaña, modales, preferencias, tres idiomas, ambos temas y dock en quickstart.md per SC-001/002/003/004/007 (partial).
+- [X] T049 MEDIUM Mostrar aviso localizable de auxiliares ambiguos conservando principales accesibles y aviso de nombres en apps/borealis/source/texture_browser_screen.cpp y recursos i18n per T009/019 (partial).
+- [ ] T050 MEDIUM Medir en Switch físico 100 entradas: actividad <1 s y respuesta <250 ms en al menos 95/100 órdenes durante carga; registrar método y resultados en quickstart.md per SC-005, T044 (partial).
+- [X] T051 MEDIUM Conciliar README.md, quickstart.md y docs/BOREALIS_MIGRATION.md con feedback físico existente, separando confirmaciones concretas de aceptación pendiente per T045, SC-007 (partial).
+
+
+### Convergence execution — 2026-11-12 (actualizado 2026-11-18)
+
+T040/T046/T047: suite integrada de sesión/adaptador y nueva suite de pantallas Borealis
+(`tests/borealis_ui_screens_test.cpp`) verificadas en host; cubren solo control, solo
+touch, alternancia de input, 20 ciclos detalle/volver, 10 cambios de pestaña, reanudación
+desde `CatalogSuspended`, fallback al desaparecer entrada, `SettingsScreen`
+(draft/dropdown/conflict/dirty-leave), menú `Plus`, snapshots A/B, traps de mutación,
+cierres ordenados y sincronización determinística.
+T049: aviso implementado en label multilínea existente, sin nuevas rutas de foco/touch;
+claves y JSON verificados en los tres idiomas, build Borealis aprobado. La revisión
+visual/control/touch del aviso queda explícita en la matriz física pendiente.
+T051: README, quickstart e informe concilian las confirmaciones concretas del usuario
+con el registro físico existente. No se atribuye ese feedback al NRO nuevo.
+T023/T031/T039/T043/T044/T048/T050 permanecen abiertas exclusivamente para sus recorridos
+y mediciones en hardware Switch físico (sin consola física ni emulador disponibles en esta
+ejecución).
+Los estados de las fases anteriores se conservaron. No hay hooks registrados
+(`.specify/extensions.yml` ausente), ni guardados personales accedidos/restaurados.
+
+Las diez suites también pasan con ASan/UBSan (`SANITIZE=1 ASAN_OPTIONS=detect_leaks=0`;
+LeakSanitizer no funciona bajo el ptrace del sandbox). Regresiones existentes y ambos builds aprobados.

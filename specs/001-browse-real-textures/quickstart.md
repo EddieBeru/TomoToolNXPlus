@@ -1,8 +1,9 @@
 # Quickstart: validación del navegador de texturas
 
 Esta guía contiene los checks de la implementación y las rutas de aceptación pendientes.
-Las suites host y cross-builds se ejecutaron; no se ha validado este navegador en emulador
-ni Switch físico. Los resultados de cada plataforma se informan por separado.
+Las suites host y cross-builds se ejecutaron. Existen confirmaciones físicas concretas
+del usuario, enumeradas en la matriz al final; la aceptación completa sigue pendiente.
+No hay ejecución de emulador registrada. Cada plataforma se informa por separado.
 
 ## Prerrequisitos
 
@@ -42,8 +43,9 @@ tests/run_texture_browser.sh
 SANITIZE=1 tests/run_texture_browser.sh
 ```
 
-El script contiene comandos exactos para siete ejecutables: decoder, scanner, nombres,
-modelo, preview, sesión y adaptador real con shim libnx. Véase
+El script contiene comandos exactos para diez ejecutables: decoder, scanner, nombres,
+modelo, preview, sesión, adaptador real con shim libnx, selector de perfil,
+integración completa de sesión/adaptador y pantallas Borealis sobre shim UI. Véase
 [tests/README.md](../../tests/README.md) para cobertura, limitaciones y regresiones
 existentes de settings/config/save safety. El shim nunca se usa en builds Switch.
 Los fallos se programan sobre fuentes sintéticas; no se necesitan guardados personales.
@@ -143,3 +145,79 @@ Final cross-builds: make -j4 and make -j4 borealis passed after implementation.
 ELF symbol audit confirms fsOpen_SaveDataReadOnly and no SaveMount, SaveWorkflow,
 SaveEditor, MiiManager or TextureProcessor import/encoder symbols. Browser locale key
 sets match across all three included languages. No emulator or hardware result is claimed.
+
+
+## Matriz de aceptación detallada — 2026-11-12
+
+Estados: aprobado, fallido o pendiente. “Aprobado (feedback)” se limita a lo confirmado
+por el usuario en [el registro físico](../../docs/HARDWARE_UI_FEEDBACK.md), secciones
+“Hardware feedback” y “Confirmed physical retest and closure”. No constituye una nueva
+prueba del NRO con el aviso añadido en esta convergencia. No hay casos fallidos abiertos
+reportados; sin evidencia suficiente el caso queda pendiente.
+
+| Caso / criterio | Host | Switch físico | Evidencia o comprobación faltante |
+| --- | --- | --- | --- |
+| Selector nativo al iniciar / SC-001 | Aprobado | Aprobado (feedback) | Confirmado 2026-11-10 |
+| Catálogos 0/1/100 y cuenta A/B / SC-001 | Aprobado | Pendiente | Inventario y nombres reales del entorno sintético |
+| Cambiar/cancelar perfil global / SC-001/004 | Aprobado (adaptador) | Pendiente | Mantener contexto y descartar entregas A/B |
+| Sin cuenta / sin guardado / SC-004 | Aprobado (fuente) | Pendiente | Presentación y recuperación |
+| Vacío / directorio ausente / SC-004 | Aprobado (fuente) | Pendiente | Presentación y recuperación |
+| Acceso denegado / metadata fallida / SC-004 | Aprobado (fuente) | Pendiente | Presentación y reintento |
+| Lectura interrumpida, retry sin reinicio / SC-004 | Aprobado | Pendiente | Interacción y mensaje |
+| Nombres ausentes/corruptos / SC-004 | Aprobado | Pendiente | Fallback visible |
+| Imagen corrupta, fallback y retry / SC-004 | Aprobado | Pendiente | Error local, limpiar imagen previa |
+| Auxiliares ambiguos + aviso de nombres | Aprobado (catálogo) | Pendiente | Dos avisos legibles, principales accesibles |
+| Preview proporcional y accesible con control / SC-002 | Aprobado (CPU/bounds) | Aprobado (feedback) | Retest 2026-11-12, sin matriz completa de layouts |
+| Foco del detalle y footer | Aprobado (scope) | Aprobado (feedback) | Confirmación de correcciones anteriores |
+| Plus abre Save/Exit | Aprobado (registro de acciones) | Aprobado (feedback) | No valida todos los caminos Save/Exit/error |
+| Todas las acciones, solo control / SC-002 | Aprobado (UI shim) | Pendiente | Selector, listado, refresh, retry, detalle, volver y salida |
+| Todas las acciones, solo touch / SC-002 | Aprobado (UI shim) | Pendiente | Repetir el mismo recorrido sin control |
+| Alternancia de input, held input y touch-scroll / SC-002 | Aprobado (UI shim) | Pendiente | Foco coherente y ninguna doble activación |
+| 20 ciclos detalle/volver / SC-003 | Aprobado (modelo) | Pendiente | Registrar 20/20 foco, identidad y posición visible |
+| 10 cambios de pestaña / SC-003 | Aprobado (modelo) | Pendiente | Registrar 10/10, suspensión/reanudación durante carga |
+| Entrada desaparecida tras refresh / SC-003 | Aprobado | Pendiente | Siguiente/última/Actualizar según colección |
+| Modales, dropdowns y aislamiento de shortcuts / SC-002 | Aprobado (shim) | Pendiente | No activar capa inferior; retorno de foco |
+| Preferencias: borrador, guardar, descartar, error / SC-002 | Aprobado (store) | Pendiente | Navegar sin guardar/descartar implícitamente |
+| Inglés, claro/oscuro, handheld/dock / SC-007 | Aprobado (claves) | Pendiente | Revisar las cuatro combinaciones, nombres largos y avisos |
+| Español, claro/oscuro, handheld/dock / SC-007 | Aprobado (claves) | Pendiente | Revisar las cuatro combinaciones, nombres largos y avisos |
+| es-419, claro/oscuro, handheld/dock / SC-007 | Aprobado (claves) | Pendiente | Revisar las cuatro combinaciones, nombres largos y avisos |
+| Inventario/bytes e intentos de mutación / SC-006 | Aprobado (integrado con shim) | Pendiente | Comparación tras todas las rutas físicas |
+| Actividad <1 s, 95/100 órdenes <250 ms / SC-005 | No aplica | Pendiente | Medición física descrita abajo |
+
+Todas las celdas de emulador están pendientes. Los checks de modelo/shim no renderizan
+la UI y no sustituyen las acciones físicas. Ningún guardado personal se preparó/restauró.
+
+### Protocolo pendiente de latencia (T050)
+
+Usar únicamente una consola de prueba con colección sintética/sanitizada ya disponible
+de 100 entradas, sin preparar/restaurar guardados como parte de esta tarea. Registrar
+versión/hash del NRO, modelo/HOS, handheld/dock, idioma/tema, método de captura y su
+resolución temporal. Medir desde activar la carga hasta actividad visible (<1000 ms).
+Durante carga registrar 100 pares tiempo de orden/primera respuesta visible y sus
+latencias; aprobar solo si al menos 95 son estrictamente menores a 250 ms. Indicar
+órdenes y método de mantener carga activa, sin atribuir tiempos del host a Switch.
+
+Resultado actual: **pendiente**, sin consola de prueba disponible en esta ejecución.
+No hay tiempos, percentiles ni porcentajes medidos que reportar.
+
+
+### Verificación de convergencia en host — 2026-11-12 (actualizado 2026-11-18)
+
+- `tests/run_texture_browser.sh`: diez suites aprobadas, incluida integración real
+  sesión/catálogo/preview/adaptador con shim y la suite de pantallas Borealis
+  (`tests/borealis_ui_screens_test.cpp`: solo control, solo touch, alternancia de input,
+  20 ciclos detalle/volver, 10 cambios de pestaña, reanudación desde `CatalogSuspended`,
+  fallback al desaparecer entrada, `SettingsScreen` y menú `Plus`). Inventario/bytes
+  sintéticos preservados; traps de write/create/delete/rename/commit no activados, cuentas A/B aisladas.
+- Nuevas regresiones: lecturas parciales de 997 bytes, errores de tamaño/lectura con
+  cierre, tabla de nombres duplicada, canvas cuadrado, límite exacto de salida zstd
+  y frame válido con ventana de 16 MiB rechazado por el límite de 8 MiB.
+- `make -j4` y `make -j4 borealis`: aprobados con toolchain existente.
+- Regresiones de settings, save safety, config, foco Borealis, bounds de preview y
+  registro de acciones: aprobadas con los comandos de tests/README.md.
+- JSON válido y mismas claves browser en inglés/español/es-419; `git diff --check` limpio.
+- No emulador ni nueva prueba física. El aviso usa el label multilínea existente,
+  sin controles ni cambios de navegación; su layout/foco/touch físico está pendiente.
+
+- `SANITIZE=1 ASAN_OPTIONS=detect_leaks=0 tests/run_texture_browser.sh`: diez suites
+  aprobadas con ASan/UBSan (LeakSanitizer no pudo operar bajo ptrace en el sandbox).

@@ -45,5 +45,26 @@ int main(){
     auto* bar=dynamic_cast<brls::BottomBar*>(footer.get());assert(bar);
     for(auto* id:{"brls/battery","brls/wireless","brls/hints/time"})
         assert(bar->getView(id)->visibility==brls::Visibility::GONE);
+
+    brls::Application::fontStash = {
+        {brls::FONT_REGULAR, 1},
+        {brls::FONT_CHINESE_SIMPLIFIED, 2},
+        {brls::FONT_CHINESE_SIMPLIFIED_EXT, 3},
+        {brls::FONT_CHINESE_TRADITIONAL, 4},
+        {brls::FONT_KOREAN_REGULAR, 5},
+        {brls::FONT_SWITCH_ICONS, 6},
+        {brls::FONT_MATERIAL_ICONS, 7},
+    };
+    unsigned char dummyFontByte = 0x54;
+    configurePrimaryFont(&dummyFontByte, 1);
+    const int primary = brls::Application::getFont(brls::FONT_CHINESE_SIMPLIFIED);
+    assert(primary != 2 && primary != brls::FONT_INVALID);
+    const std::vector<int> expectedFallbacks = {2, 3, 4, 5, 6, 7};
+    assert(brls::Application::nvg.fontFallbacks.at(primary) == expectedFallbacks);
+
+    configurePrimaryFont(nullptr, 0);
+    assert(brls::Application::getFont(brls::FONT_CHINESE_SIMPLIFIED) == primary);
+    assert(brls::Application::nvg.fontFallbacks.at(primary) == expectedFallbacks);
+
     std::puts("Borealis actual navigation action registration and footer policy: OK");
 }

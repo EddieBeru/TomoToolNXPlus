@@ -165,3 +165,34 @@ The feature task checklist is not marked complete on the basis of this feedback.
 KDE deployment is now part of the repository workflow rather than depending on
 personal absolute paths or temporary helpers. See docs/DEPLOY_SWITCH.md for the
 explicit undated-target option, safeguards and evidence boundaries.
+
+## Physical M0 retest and Spanish accent spacing fix — 2026-11-19
+
+After deploying `/switch/TomoToolNXPlusBorealis.nro` via
+`make -j4 deploy-borealis DEPLOY_ARGS='--replace-undated'` (with verified MTP SHA-256
+readback and local recovery backup), the user tested the M0 build on physical Switch
+hardware and reported that everything looked good (“todo parece estár bien”), except
+for abnormal horizontal spacing around `á` in “Automático”.
+
+Cause: Borealis (`libs/borealis/library/lib/core/application.cpp` and
+`libs/borealis/library/lib/platforms/switch/switch_font.cpp`) resolves
+`Application::getDefaultFont()` on Switch to `FONT_CHINESE_SIMPLIFIED`
+(`PlSharedFontType_ChineseSimplified`), putting `PlSharedFontType_Standard` only in
+the fallback list. In Nintendo's Simplified Chinese shared font, accented Latin vowels
+(`á`, `é`, `í`, `ó`, `ú`, etc.) exist in the primary glyph table as full-width CJK
+Pinyin characters instead of falling back to the proportional Latin font.
+
+Fix: `borealis_app::navigation::initialize()` now calls `configurePrimaryFont()` to
+load `PlSharedFontType_Standard` into `FONT_CHINESE_SIMPLIFIED` after
+`Application::createWindow()` and before any `brls::Label` caches `getDefaultFont()`,
+attaching the original `zh-Hans`, `zh-Hans-ext`, `zh-Hant`, `ko`, `switch-icons` and
+`material` fonts as fallbacks without modifying vendored files in `libs/borealis/`.
+
+Verification: `tests/borealis_navigation_actions_test.cpp` checks `configurePrimaryFont`
+primary replacement and fallback order against the host shim; `tests/run_texture_browser.sh`
+(including ASan/UBSan) and `make -j4 borealis` pass. After deploying the updated
+`/switch/TomoToolNXPlusBorealis.nro` via `make -j4 deploy-borealis DEPLOY_ARGS='--replace-undated'`
+(with verified MTP SHA-256 readback and recovery backup `.deploy-backups/9eb1f83fe6d5441ea1769b1ebc4cb58c`),
+the user confirmed on physical Switch hardware (“ahora sí”) that Spanish accented
+text spacing and the M0 flows work properly. Exhaustive multi-locale/theme/docked
+walkthroughs and formal latency measurements (SC-005) remain separate in `quickstart.md`.

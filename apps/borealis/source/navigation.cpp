@@ -1,6 +1,10 @@
 #include "navigation.hpp"
 #include "screen_activity.hpp"
 
+#ifdef __SWITCH__
+#include <switch.h>
+#endif
+
 namespace borealis_app::navigation {
 namespace {
 class Footer : public brls::BottomBar {
@@ -26,9 +30,38 @@ void bindAction(brls::View* scope, const std::string& label, brls::ControllerBut
 }
 }
 
+void configurePrimaryFont(void* address, size_t size) {
+    if (!address || !size)
+        return;
+    // Borealis defaults Switch Labels to FONT_CHINESE_SIMPLIFIED; promote Nintendo's
+    // Standard font so Latin accents use proportional metrics while retaining CJK/icon fallbacks.
+    const int zhHans = brls::Application::getFont(brls::FONT_CHINESE_SIMPLIFIED);
+    if (!brls::Application::loadFontFromMemory(
+            brls::FONT_CHINESE_SIMPLIFIED, address, size, false))
+        return;
+    auto* vg = brls::Application::getNVGContext();
+    const int primary = brls::Application::getFont(brls::FONT_CHINESE_SIMPLIFIED);
+    for (const int fallback : {
+             zhHans,
+             brls::Application::getFont(brls::FONT_CHINESE_SIMPLIFIED_EXT),
+             brls::Application::getFont(brls::FONT_CHINESE_TRADITIONAL),
+             brls::Application::getFont(brls::FONT_KOREAN_REGULAR),
+             brls::Application::getFont(brls::FONT_SWITCH_ICONS),
+             brls::Application::getFont(brls::FONT_MATERIAL_ICONS),
+         }) {
+        if (fallback != brls::FONT_INVALID && fallback != primary)
+            nvgAddFallbackFontId(vg, primary, fallback);
+    }
+}
+
 void initialize() {
     // AppletFrame and Dropdown both inflate this factory, including library overlays.
     brls::Application::registerXMLView("brls:BottomBar", [] { return new Footer(); });
+#ifdef __SWITCH__
+    PlFontData standardFont{};
+    if (R_SUCCEEDED(plGetSharedFontByType(&standardFont, PlSharedFontType_Standard)))
+        configurePrimaryFont(standardFont.address, standardFont.size);
+#endif
 }
 
 void back(brls::View* scope, Action action, const std::string& label) {

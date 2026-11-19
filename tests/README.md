@@ -68,11 +68,15 @@ tests/run_texture_browser.sh
 SANITIZE=1 tests/run_texture_browser.sh
 ```
 
-The script compiles seven independent executables in a temporary directory, runs them,
+The script compiles ten independent executables in a temporary directory, runs them,
 and removes only that directory. It covers CPU decode golden outputs from the old
 implementation, BC1/BC3 and rectangular canvas layouts, bounded zstd, filename association,
 Player names/index/UTF-16 validation, account-local catalogs, refresh/context transitions,
-preview priority/fallback, and worker cancellation/replaced pending jobs/stale deliveries.
+preview priority/fallback, worker cancellation/replaced pending jobs/stale deliveries,
+and the Borealis UI screens (`borealis_ui_screens_test.cpp`) against the host UI shim
+(controller-only, touch-only, alternating input, 20 detail/back cycles, 10 tab switches,
+`CatalogSuspended` resume, disappearing-entry fallback, `SettingsScreen`
+draft/dropdown/conflict/dirty-leave flows, and the `Plus` exit menu).
 The real libnx adapter is compiled against tests/support/switch.h to check read-only
 opens, flags, sizes, complete reads, metadata classification, failures and handle cleanup.
 The shim include path is never used by either Switch build. It cannot establish HOS
@@ -161,3 +165,14 @@ identical/missing targets, dry runs, backup verification, disconnects, preflight
 changes, capacity, upload/readback errors, restricted paths, and opening the
 source before deletion. Live USB behavior is separate evidence; see
 [deployment workflow](../docs/DEPLOY_SWITCH.md).
+
+
+The integrated browser suite links the production session, catalog, preview decoder and
+read-only adapter against `support/texture_read_shim.h`. Synthetic A/B files share stems
+but differ in names and decoded pixels. It checks refresh/error/retry, a read held by a
+condition variable during cancellation/account change, queued delivery after stop, ordered
+handle closure and exact in-memory file inventory/byte preservation. No renderer or
+hardware is involved. The source tests additionally accumulate 997-byte short reads;
+name tests reject duplicate indexed tables; preview tests preserve main priority for square
+canvas. Mutation APIs exposed by the shim fail immediately if called; unknown APIs fail
+compilation/linking. This evidence is bounded to these instrumented paths.

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <borealis.hpp>
+#include <cstddef>
 #include <functional>
 #include "navigation_focus.hpp"
 
@@ -9,6 +10,7 @@ using Action = std::function<void()>;
 
 // Install after createWindow() registers Borealis factories, before creating app views.
 void initialize();
+void configurePrimaryFont(void* address, size_t size);
 void back(brls::View* scope, Action action, const std::string& label = brls::getStr("hints/back"));
 void root(brls::View* scope);
 void saveExit(brls::View* scope, Action action);

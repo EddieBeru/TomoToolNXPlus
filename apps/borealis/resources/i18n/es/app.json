@@ -41,6 +41,7 @@
   "browser_read_error": "No se pudo leer el contenido. Reintenta o vuelve.",
   "browser_empty": "No hay texturas guardadas. Actualiza o elige otra cuenta.",
   "browser_readonly": "Guardado de solo lectura",
+  "browser_association_warning": "Se omitieron imágenes auxiliares ambiguas. Las texturas principales siguen disponibles.",
   "browser_names_warning": "No se pudieron leer algunos nombres. Se muestran sus identificadores.",
   "browser_closing": "Cerrando cuando terminen las lecturas pendientes…",
   "browser_detail": "Detalle de textura",

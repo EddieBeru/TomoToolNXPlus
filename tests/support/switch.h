@@ -54,3 +54,10 @@ Result pselUiShow(PselUiSettings*, AccountUid*);
 
 Result accountProfileGetImageSize(AccountProfile*, u32*);
 Result accountProfileLoadImage(AccountProfile*, void*, size_t, u32*);
+
+// Save mutation entry points are traps in the read-source test implementation.
+Result fsFileWrite(FsFile*,s64,const void*,u64,u32);
+Result fsFsCommit(FsFileSystem*);
+Result fsFsCreateFile(FsFileSystem*,const char*,s64,u32);
+Result fsFsDeleteFile(FsFileSystem*,const char*);
+Result fsFsRenameFile(FsFileSystem*,const char*,const char*);

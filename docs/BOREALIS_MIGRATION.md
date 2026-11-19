@@ -147,11 +147,12 @@ not claimed game-format maxima. Paths/config/backups and WebUI remain unchanged.
 
 Host checks cover catalogs 0/1/100, names, layouts/golden pixels, zstd limits, source
 failures, read-only API flags, cancellation and stale deliveries. Run
-[the seven host suites](../tests/README.md#read-only-borealis-texture-browser).
+[the browser host suites](../tests/README.md#read-only-borealis-texture-browser).
 Both Makefile targets cross-build; source/link-map inspection complements the source tests.
 No personal saves were accessed or modified. Builds are not proof of compatibility.
 
-No emulator or physical Switch run was performed for this slice. Controller/touch,
+The initial implementation run had no emulator or physical Switch available. Subsequent
+user retests confirmed specific fixes (see below). Full controller/touch,
 modal transitions, focus/scroll restoration on the renderer, three-language text layout,
 light/dark themes, handheld/docked rendering, real account-save permissions and the
 latency target still require the [acceptance guide](../specs/001-browse-real-textures/quickstart.md).
@@ -174,3 +175,29 @@ Settings opens and returns without a fade, preventing two full screens from bein
 blended. The browser's catalog/selection/scroll are retained through the pause.
 New portrait limits/failures are covered by the native adapter host tests. Physical
 profile changes, portrait/button layout and the revised transition still require retesting.
+
+
+### Convergence evidence — 2026-11-12
+
+The [physical feedback record](HARDWARE_UI_FEEDBACK.md#confirmed-physical-retest-and-closure)
+confirms startup native selection, focus/footer corrections, Plus opening Save/Exit,
+proportional previews without edge repetition and controller reachability of the preview.
+These are user-reported physical results for the previously installed build, not new
+hardware tests of this convergence change. Earlier “pending retest” notes above describe
+historical checkpoints; the confirmation supersedes them only for those reported fixes.
+
+The [acceptance matrix](../specs/001-browse-real-textures/quickstart.md#matriz-de-aceptación-detallada--2026-11-12)
+records all ten host suites passing (including `tests/borealis_ui_screens_test.cpp` for
+Borealis screen controller/touch/alternating-input/20-cycle/10-tab/settings/exit-menu
+flows against the host UI shim) while keeping untested physical account/error paths,
+input methods, repeated cycles, preferences, locale/theme/dock combinations and latency
+explicitly pending on physical hardware. The new ambiguous-image notice also requires
+visual/touch verification. No emulator run or new physical run is claimed.
+
+On 2026-11-19, after deploying via `make -j4 deploy-borealis`, user physical feedback
+confirmed the M0 flows look good aside from wide lateral spacing around `á` in
+“Automático” caused by Borealis defaulting Switch labels to
+`PlSharedFontType_ChineseSimplified`. `navigation::initialize()` now promotes
+`PlSharedFontType_Standard` as the primary font with CJK/icon fallbacks without modifying
+vendored Borealis sources; after redeploying with verified MTP SHA-256 readback, the
+user confirmed the fix on physical Switch hardware (“ahora sí”).

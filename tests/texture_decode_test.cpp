@@ -49,6 +49,16 @@ int main() {
     unknown.resize(ZSTD_compress2(ctx,unknown.data(),unknown.size(),raw.data(),raw.size()));
     ZSTD_freeCCtx(ctx);
     assert(TextureDecode::decompress(unknown,decoded).empty() && decoded==raw);
+    // A valid frame may advertise a window larger than its actual output.
+    auto wideWindow=unknown;assert((wideWindow[4]&0x20)==0);
+    wideWindow[5]=0x70; // 16 MiB window, above the browser's 8 MiB bound.
+    std::vector<uint8_t> reference(raw.size());
+    auto referenceSize=ZSTD_decompress(reference.data(),reference.size(),wideWindow.data(),wideWindow.size());
+    assert(!ZSTD_isError(referenceSize) && referenceSize==raw.size() && reference==raw);
+    assert(!TextureDecode::decompress(wideWindow,decoded).empty() && decoded.empty());
+    std::vector<uint8_t> exact(4*1024*1024,0), exactFrame(ZSTD_compressBound(exact.size()));
+    exactFrame.resize(ZSTD_compress(exactFrame.data(),exactFrame.size(),exact.data(),exact.size(),1));
+    assert(TextureDecode::decompress(exactFrame,decoded).empty() && decoded==exact);
     std::vector<uint8_t> oversized(4*1024*1024+1,0);
     std::vector<uint8_t> oversizedFrame(ZSTD_compressBound(oversized.size()));
     oversizedFrame.resize(ZSTD_compress(oversizedFrame.data(),oversizedFrame.size(),oversized.data(),oversized.size(),3));

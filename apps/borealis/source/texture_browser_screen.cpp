@@ -175,7 +175,11 @@ void TextureBrowserScreen::render(){
     if(model.state==State::CatalogError){status->setText(errorMessage(model.status.error));return;}
     if(model.state==State::Empty){status->setText(tr("empty"));return;}
     if(model.state!=State::Ready){status->setText(tr("choose_global"));return;}
-    status->setText(model.catalog.namesWarning?tr("names_warning"):tr("readonly"));
+    std::string notice=model.catalog.namesWarning?tr("names_warning"):tr("readonly");
+    if(std::any_of(model.catalog.entries.begin(),model.catalog.entries.end(),
+                   [](const Entry& entry){return entry.associationWarning;}))
+        notice+="\n"+tr("association_warning");
+    status->setText(notice);
     auto selected=model.context.selectedStem;
     for(size_t i=0;i<model.catalog.entries.size();++i){
         auto entry=model.catalog.entries[i];

@@ -16,6 +16,9 @@ int main(){
     s.files[entry.canvasRef]=compress(std::vector<uint8_t>(256*128*4,255));
     auto p=loadPreview(s,entry,[]{return false;});
     assert(p && p.value.canvas && p.value.width==256 && p.value.height==128);
+    s.files[entry.canvasRef]=compress(std::vector<uint8_t>(256*256*4,255));
+    p=loadPreview(s,entry,[]{return false;});
+    assert(p && !p.value.canvas && !p.value.fallback && p.value.width==512);
     s.files[entry.canvasRef]={1,2,3};
     p=loadPreview(s,entry,[]{return false;});assert(p && !p.value.canvas && p.value.fallback);
     s.files[entry.mainRef]={1,2,3};

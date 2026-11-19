@@ -41,6 +41,7 @@
   "browser_read_error": "Content could not be read. Retry or return.",
   "browser_empty": "No saved textures. Refresh or choose another account.",
   "browser_readonly": "Read-only game save",
+  "browser_association_warning": "Ambiguous optional images were skipped. Main textures remain available.",
   "browser_names_warning": "Some names could not be read. Texture identifiers are shown instead.",
   "browser_closing": "Closing after pending reads finish…",
   "browser_detail": "Texture details",
