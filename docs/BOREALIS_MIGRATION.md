@@ -213,3 +213,14 @@ user confirmed the fix on physical Switch hardware (“ahora sí”).
   - Host: all 12 suites in `tests/run_texture_browser.sh` (plain and `SANITIZE=1 ASAN_OPTIONS=detect_leaks=0`), `en-US`/`es`/`es-419` i18n key parity (`162` keys each), and standalone host regressions passed.
   - Builds & ELF audit: `make -j4` and `make -j4 borealis` succeeded; `aarch64-none-elf-nm -C build/borealis/TomoToolNXPlusBorealis.elf` reported 0 references to `SaveMount`, `SaveWorkflow`, `Backup`, `MiiManager`, or `SaveEditor::Save`.
   - Emulator: not executed. Physical Switch hardware verification remains pending per `specs/002-browse-player-readonly/quickstart.md`.
+
+
+### Milestone M2 — Read-only Mii tab (Mii.sav + optional Map.sav) — 2026-11-22
+
+- Replaced the fictional sample entries in the `Mii` tab (index `2` in `apps/borealis/source/app.cpp`) with a 3-level hierarchical read-only browser without subtabs: `MiiBrowserScreen` → `MiiDetailScreen` → `MiiSectionScreen` (`apps/borealis/source/mii_browser_screen.{hpp,cpp}`), backed by the pure read-only module `MiiRoster` (`include/mii_roster.h`, `source/mii_roster.cpp`).
+- Extended `TextureBrowser::ReadSource` (`include/texture_browser.h`, `apps/borealis/source/texture_read_source.cpp`) strictly under `fsOpen_SaveDataReadOnly` (`FsOpenMode_Read`) to allow `"/Mii.sav"` (`MaxMiiBytes = 8 MiB`) and optional `"/Map.sav"` (`MaxMapBytes = 4 MiB`), without linking `SaveMount`, `SaveWorkflow`, `Backup`, `MiiManager`, or `SaveEditor::Save`, and without modifying `source/main.cpp`.
+- Covers up to 70 residents (including empty islands with `0` residents distinguished from errors) and all 7 resident sections (`Stats`, `Words`, `Relations`, `Belongings`, `Habits`, `Housing`, `Social Summary`), reusing `include/belongings_data.h`, `include/habits_data.h`, and `include/rel_tier_labels.h` with local degradation when `Map.sav` is absent or unknown enum hashes appear.
+- **Verification**:
+  - Host: all 14 suites in `tests/run_texture_browser.sh` (plain and `SANITIZE=1 ASAN_OPTIONS=detect_leaks=0`, including `mii-roster`, `mii-context`, and expanded `ui-screens`) and `en-US`/`es`/`es-419` i18n key parity (`290` keys each) passed.
+  - Builds & ELF audit: `make -j4` and `make -j4 borealis` succeeded; `aarch64-none-elf-nm -C build/borealis/TomoToolNXPlusBorealis.elf` reported `0` references to `SaveMount`, `SaveWorkflow`, `Backup`, `MiiManager`, or `SaveEditor::Save`.
+  - Emulator: not executed. Physical Switch hardware verification remains pending per `specs/003-browse-mii-readonly/quickstart.md`.

@@ -1,8 +1,10 @@
+#include "support/mii_roster_fixtures.h"
 #include "support/player_profile_fixtures.h"
 #include "support/texture_read_shim.h"
 
 #include "app.hpp"
 #include "exit_menu.hpp"
+#include "mii_browser_screen.hpp"
 #include "navigation.hpp"
 #include "player_browser_screen.hpp"
 #include "profile_header.hpp"
@@ -179,6 +181,11 @@ borealis_app::TextureBrowserScreen* findBrowser(brls::View* root) {
     return list.empty() ? nullptr : list.front();
 }
 
+borealis_app::MiiBrowserScreen* findMiiBrowser(brls::View* root) {
+    auto list = findAll<borealis_app::MiiBrowserScreen>(root);
+    return list.empty() ? nullptr : list.front();
+}
+
 borealis_app::PlayerBrowserScreen* findPlayerBrowser(brls::View* root) {
     auto list = findAll<borealis_app::PlayerBrowserScreen>(root);
     return list.empty() ? nullptr : list.front();
@@ -188,6 +195,10 @@ void setBrowserScrollableHeight(brls::View* root) {
     if (auto* browser = findBrowser(root)) {
         if (browser->getContentView())
             browser->getContentView()->setHeight(4000.0f);
+    }
+    if (auto* miiBrowser = findMiiBrowser(root)) {
+        if (miiBrowser->getContentView())
+            miiBrowser->getContentView()->setHeight(4000.0f);
     }
     if (auto* playerBrowser = findPlayerBrowser(root)) {
         if (playerBrowser->getContentView())
@@ -219,10 +230,13 @@ void populateAccountSaves() {
     // Target entry below the first screen with valid rectangular 256x512 canvas.
     saves[1]["/Ugc/UgcFood049.canvas.zs"] = rectCanvas;
     saves[1]["/Player.sav"] = PlayerProfileFixtures::makeSyntheticPlayerSavA(true, true);
+    saves[1]["/Mii.sav"] = MiiRosterFixtures::makeSyntheticMiiSavA();
+    saves[1]["/Map.sav"] = MiiRosterFixtures::makeSyntheticMapSavA();
 
     saves[2]["/Ugc/UgcFood000.ugctex.zs"] = mainB;
     saves[2]["/Ugc/UgcFood049.ugctex.zs"] = mainB;
     saves[2]["/Player.sav"] = PlayerProfileFixtures::makeSyntheticPlayerSavB(true);
+    saves[2]["/Mii.sav"] = MiiRosterFixtures::makeSyntheticMiiSavB();
 }
 
 void resetShimState() {
@@ -642,9 +656,9 @@ int main() {
     browser->setContentOffsetY(640.0f, false);
     brls::Application::giveFocus(entry49);
     for (int sw = 0; sw < 5; ++sw) {
-        assert(press(brls::BUTTON_RT)); // to Mii
+        assert(press(brls::BUTTON_LT)); // to WebUI
         assert(queue.drainAvailable() == 0);
-        assert(press(brls::BUTTON_LT)); // back to Textures
+        assert(press(brls::BUTTON_RT)); // back to Textures
         assert(queue.drainAvailable() == 0);
         assert(browser->getContentOffsetY() == 640.0f);
         assert(brls::Application::getCurrentFocus() == entry49);
@@ -666,7 +680,7 @@ int main() {
             std::unique_lock<std::mutex> lock(m);
             assert(cv.wait_for(lock, std::chrono::seconds(5), [&] { return entered; }));
         }
-        assert(press(brls::BUTTON_RT)); // Suspends CatalogLoading on leave and cancels session.
+        assert(press(brls::BUTTON_LT)); // Suspends CatalogLoading on leave and cancels session.
         {
             std::lock_guard<std::mutex> lock(m);
             released = true;
@@ -674,7 +688,7 @@ int main() {
         }
         beforeRead = {};
         assert(findCellByDetail(browser, "UgcFood049") == nullptr);
-        assert(press(brls::BUTTON_LT)); // Resumes with single new reload.
+        assert(press(brls::BUTTON_RT)); // Resumes with single new reload.
         queue.drain();
         assert(queue.drainAvailable() == 0);
         setBrowserScrollableHeight(root);
@@ -768,8 +782,7 @@ int main() {
     }
 
     // Activate tab 3 (Jugador): starts at initial account 1 load for Player.sav.
-    assert(press(brls::BUTTON_RT)); // 1->2
-    assert(press(brls::BUTTON_RT)); // 2->3 (Jugador)
+    tap(sidebarItems[3]);
     queue.drain();
     auto* playerScreen = findPlayerBrowser(root);
     assert(playerScreen);
@@ -940,6 +953,219 @@ int main() {
         assert(pWishesCell);
         assert(playerScreen->getContentOffsetY() == 360.0f);
         assert(brls::Application::getCurrentFocus() == pWishesCell);
+    }
+
+    // 7. Mii tab (M2): read-only Mii.sav (+ optional Map.sav), 3-level hierarchy without subtabs,
+    // all 7 sections, 10 cycles, controller & touch, profile isolation, Empty/Error/Suspend recovery.
+    {
+        auto* unselectedMii = new borealis_app::MiiBrowserScreen(session, [] {}, [] {});
+        bool sawChooseGlobal = false;
+        for (auto* lbl : findAll<brls::Label>(unselectedMii)) {
+            if (lbl->getFullText() == "app/mii_choose_global")
+                sawChooseGlobal = true;
+        }
+        assert(sawChooseGlobal);
+        unselectedMii->freeView();
+    }
+
+    assert(press(brls::BUTTON_LT)); // 3 (Jugador) -> 2 (Mii)
+    queue.drain();
+    auto* miiScreen = findMiiBrowser(root);
+    assert(miiScreen);
+    setBrowserScrollableHeight(root);
+
+    // No sample entries; 3 occupied residents for Account 1 (Lucía 🌟, Kenji, Mía).
+    assert(findCell(miiScreen, "app/sample_2") == nullptr);
+    auto* mRefreshCell = findCell(miiScreen, "app/browser_refresh");
+    auto* mTabsCell = findCell(miiScreen, "app/tabs");
+    auto* luciaCell = findCell(miiScreen, "Lucía 🌟");
+    auto* kenjiCell = findCell(miiScreen, "Kenji");
+    auto* miaCell = findCell(miiScreen, "Mía");
+    assert(mRefreshCell && mTabsCell && luciaCell && kenjiCell && miaCell);
+    assert(findAll<brls::DetailCell>(miiScreen).size() == 5); // Refresh + 3 residents + Tabs
+
+    // Controller flow: open Lucía 🌟 -> MiiDetailScreen -> inspect all 7 sections -> B back.
+    miiScreen->setContentOffsetY(480.0f, false);
+    assert(pressOn(luciaCell, brls::BUTTON_A));
+    auto* miiDetail = topContent();
+    assert(miiDetail != root);
+    auto* detailBack = findCell(miiDetail, "hints/back");
+    assert(detailBack && brls::Application::getCurrentFocus() == detailBack);
+
+    const std::vector<std::pair<std::string, std::string>> expectedSections = {
+        {"app/mii_sec_stats", "app/mii_stat_fullness"},
+        {"app/mii_sec_words", "app/mii_word_slot #1"},
+        {"app/mii_sec_relations", "Kenji (#14)"},
+        {"app/mii_sec_belongings", "app/mii_belongings_coord"},
+        {"app/mii_sec_habits", "app/mii_habit_cat_walking"},
+        {"app/mii_sec_housing", "app/mii_housing_house"},
+        {"app/mii_sec_social", "app/mii_social_total"},
+    };
+    for (const auto& sec : expectedSections) {
+        auto* secCell = findCell(miiDetail, sec.first);
+        assert(secCell);
+        assert(pressOn(secCell, brls::BUTTON_A));
+        auto* secScreen = topContent();
+        assert(secScreen != miiDetail && secScreen != root);
+        auto* secBack = findCell(secScreen, "hints/back");
+        assert(secBack && brls::Application::getCurrentFocus() == secBack);
+        auto* expectedRow = findCell(secScreen, sec.second);
+        assert(expectedRow);
+        // Activating an informational row keeps focus on it without pushing another level.
+        assert(pressOn(expectedRow, brls::BUTTON_A));
+        assert(topContent() == secScreen);
+        assert(brls::Application::getCurrentFocus() == expectedRow);
+        assert(press(brls::BUTTON_B));
+        assert(topContent() == miiDetail);
+        assert(brls::Application::getCurrentFocus() == secCell);
+    }
+    assert(press(brls::BUTTON_B)); // back to MiiBrowserScreen
+    assert(topContent() == root);
+    assert(miiScreen->getContentOffsetY() == 480.0f);
+    assert(brls::Application::getCurrentFocus() == luciaCell);
+
+    // B from MiiBrowserScreen returns focus to Mii sidebar item (index 2).
+    assert(press(brls::BUTTON_B));
+    assert(brls::Application::getCurrentFocus() == sidebarItems[2]);
+
+    // 10 consecutive cycles (list -> detail -> Stats -> B -> B) + Plus cancel preserve focus & scroll.
+    brls::Application::giveFocus(kenjiCell);
+    miiScreen->setContentOffsetY(640.0f, false);
+    for (int cycle = 0; cycle < 10; ++cycle) {
+        assert(pressOn(kenjiCell, brls::BUTTON_A));
+        auto* d = topContent();
+        assert(d != root);
+        auto* statsCell = findCell(d, "app/mii_sec_stats");
+        assert(statsCell);
+        assert(pressOn(statsCell, brls::BUTTON_A));
+        assert(topContent() != d);
+        assert(press(brls::BUTTON_B));
+        assert(topContent() == d);
+        assert(brls::Application::getCurrentFocus() == statsCell);
+        assert(press(brls::BUTTON_B));
+        assert(topContent() == root);
+        assert(miiScreen->getContentOffsetY() == 640.0f);
+        assert(brls::Application::getCurrentFocus() == kenjiCell);
+    }
+    assert(press(brls::BUTTON_START));
+    auto* mExitDlg = dynamic_cast<brls::Dialog*>(topContent());
+    assert(mExitDlg && mExitDlg->message == "app/exit_menu_prompt");
+    assert(pressOn(mExitDlg->buttons[0], brls::BUTTON_A)); // cancel
+    assert(topContent() == root);
+    assert(miiScreen->getContentOffsetY() == 640.0f);
+    assert(brls::Application::getCurrentFocus() == kenjiCell);
+
+    // Touch-only flow: tap resident -> tap Housing section -> tap Back -> tap Back.
+    tap(luciaCell);
+    auto* touchDetail = topContent();
+    assert(touchDetail != root);
+    auto* housingCell = findCell(touchDetail, "app/mii_sec_housing");
+    assert(housingCell);
+    tap(housingCell);
+    auto* touchSection = topContent();
+    assert(touchSection != touchDetail);
+    assert(findCell(touchSection, "app/mii_housing_house")->detailLabel.getFullText().find("Casa Sol") != std::string::npos);
+    tap(findCell(touchSection, "hints/back"));
+    assert(topContent() == touchDetail);
+    tap(findCell(touchDetail, "hints/back"));
+    assert(topContent() == root);
+
+    // Profile isolation (Y / ProfileHeader): cancel retains Account 1; Account 2 loads Sofía with Map.sav warning.
+    pselUid = {{0, 0}};
+    assert(pressOn(headerControl, brls::BUTTON_A));
+    assert(queue.drainAvailable() == 0);
+    assert(findCell(miiScreen, "Lucía 🌟") != nullptr);
+
+    pselUid = {{2, 0}};
+    assert(pressOn(headerControl, brls::BUTTON_A));
+    queue.drain();
+    assert(findCell(miiScreen, "Lucía 🌟") == nullptr);
+    assert(findCell(miiScreen, "Sofía") != nullptr);
+    bool sawMapWarn = false;
+    for (auto* lbl : findAll<brls::Label>(miiScreen)) {
+        if (lbl->getFullText().find("app/mii_map_warning") != std::string::npos)
+            sawMapWarn = true;
+    }
+    assert(sawMapWarn);
+
+    // Switch back to Account 1 via touch.
+    pselUid = {{1, 0}};
+    tap(headerControl);
+    queue.drain();
+    setBrowserScrollableHeight(root);
+    assert(findCell(miiScreen, "Lucía 🌟") != nullptr);
+
+    // US3: Empty island (0 residents), NoSave, Corrupt, Oversized (> 8 MiB), Suspend during Loading & recovery.
+    auto savedMiiAccount1 = saves[1];
+    saves[1]["/Mii.sav"] = MiiRosterFixtures::makeEmptyIslandMiiSav();
+    assert(pressOn(mRefreshCell, brls::BUTTON_A));
+    queue.drain();
+    assert(findCell(miiScreen, "Lucía 🌟") == nullptr);
+    bool sawEmptyMsg = false;
+    for (auto* lbl : findAll<brls::Label>(miiScreen)) {
+        if (lbl->getFullText() == "app/mii_empty")
+            sawEmptyMsg = true;
+    }
+    assert(sawEmptyMsg);
+
+    noSave = true;
+    assert(pressOn(mRefreshCell, brls::BUTTON_A));
+    assert(!mRefreshCell->isFocusable());
+    miiScreen->activateBrowser(); // double-activation guard
+    queue.drain();
+    assert(queue.drainAvailable() == 0);
+    noSave = false;
+
+    saves[1]["/Mii.sav"] = {0xde, 0xad, 0xbe, 0xef}; // corrupt
+    assert(pressOn(mRefreshCell, brls::BUTTON_A));
+    queue.drain();
+    assert(findCell(miiScreen, "Lucía 🌟") == nullptr);
+
+    saves[1]["/Mii.sav"] = std::vector<uint8_t>(TextureBrowser::MaxMiiBytes + 1, 0); // oversized > 8 MiB
+    tap(mRefreshCell);
+    queue.drain();
+    assert(findCell(miiScreen, "Lucía 🌟") == nullptr);
+
+    saves[1] = savedMiiAccount1;
+    tap(mRefreshCell); // touch recovery back to 3 residents
+    queue.drain();
+    setBrowserScrollableHeight(root);
+    luciaCell = findCell(miiScreen, "Lucía 🌟");
+    assert(luciaCell);
+
+    // Suspend while Loading -> leave to WebUI -> return to Mii issues single reload restoring focus & scroll.
+    {
+        brls::Application::giveFocus(luciaCell);
+        miiScreen->setContentOffsetY(320.0f, false);
+        std::mutex m;
+        std::condition_variable cv;
+        bool entered = false, released = false;
+        beforeRead = [&] {
+            std::unique_lock<std::mutex> lock(m);
+            entered = true;
+            cv.notify_all();
+            assert(cv.wait_for(lock, std::chrono::seconds(5), [&] { return released; }));
+        };
+        assert(pressOn(mRefreshCell, brls::BUTTON_A));
+        {
+            std::unique_lock<std::mutex> lock(m);
+            assert(cv.wait_for(lock, std::chrono::seconds(5), [&] { return entered; }));
+        }
+        tap(sidebarItems[0]); // leave Mii -> suspend + cancel
+        {
+            std::lock_guard<std::mutex> lock(m);
+            released = true;
+            cv.notify_all();
+        }
+        beforeRead = {};
+        tap(sidebarItems[2]); // return to Mii -> single reload
+        queue.drain();
+        assert(queue.drainAvailable() == 0);
+        setBrowserScrollableHeight(root);
+        luciaCell = findCell(miiScreen, "Lucía 🌟");
+        assert(luciaCell);
+        assert(miiScreen->getContentOffsetY() == 320.0f);
+        assert(brls::Application::getCurrentFocus() == luciaCell);
     }
 
     // Isolated synthetic config tests for TextureSettings (Save/Backup/Conflict/ExitMenu).

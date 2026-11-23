@@ -65,7 +65,11 @@ public:
         AccountUid uid{{key.words[0],key.words[1]}};
         rc=fsOpen_SaveDataReadOnly(&fs,0x010051F0207B2000ULL,uid);
         if(R_FAILED(rc))return {Error::Open,rc};
-        opened=true;allowed.insert("/Player.sav");return {};
+        opened=true;
+        allowed.insert("/Player.sav");
+        allowed.insert("/Mii.sav");
+        allowed.insert("/Map.sav");
+        return {};
     }
     Result<std::vector<File>> enumerate(const Cancel& cancel) override {
         if(!opened)return {{},{Error::Open}};
@@ -78,7 +82,7 @@ public:
         if(R_FAILED(rc))return {{},{Error::Enumeration,rc}};
         auto release=finally([&]{fsDirClose(&dir);});
         Result<std::vector<File>> result;
-        std::set<std::string> refs{"/Player.sav"};
+        std::set<std::string> refs{"/Player.sav","/Mii.sav","/Map.sav"};
         for(;;) {
             if(cancel())return {{},{Error::Cancelled}};
             FsDirectoryEntry item{};s64 count=0;
@@ -106,7 +110,11 @@ public:
         auto release=finally([&]{fsFileClose(&file);});
         s64 size=0;rc=fsFileGetSize(&file,&size);
         if(R_FAILED(rc) || size<0)return {{},{Error::ShortRead,rc}};
-        limit=std::min(limit,ref=="/Player.sav"?MaxPlayerBytes:MaxImageBytes);
+        size_t fileMax=MaxImageBytes;
+        if(ref=="/Player.sav")fileMax=MaxPlayerBytes;
+        else if(ref=="/Mii.sav")fileMax=MaxMiiBytes;
+        else if(ref=="/Map.sav")fileMax=MaxMapBytes;
+        limit=std::min(limit,fileMax);
         if(uint64_t(size)>limit)return {{},{Error::Limit}};
         Result<std::vector<uint8_t>> result;result.value.resize(size);
         size_t off=0;

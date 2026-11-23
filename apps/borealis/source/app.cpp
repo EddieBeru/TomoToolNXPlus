@@ -3,6 +3,7 @@
 #include "app.hpp"
 #include "profile_header.hpp"
 #include "exit_menu.hpp"
+#include "mii_browser_screen.hpp"
 #include "player_browser_screen.hpp"
 #include "texture_browser_screen.hpp"
 #include "texture_settings_screen.hpp"
@@ -106,6 +107,13 @@ public:
                 pages[i]=browser;
                 continue;
             }
+            if(i==2) {
+                miiBrowser=new MiiBrowserScreen(session,[this]{focusSidebar();},exit);
+                if(profile.state==ProfileSelectionState::Selected)
+                    miiBrowser->setProfile(profile);
+                pages[i]=miiBrowser;
+                continue;
+            }
             if(i==3) {
                 playerBrowser=new PlayerBrowserScreen(session,[this]{focusSidebar();});
                 if(profile.state==ProfileSelectionState::Selected)
@@ -152,17 +160,20 @@ public:
     }
     void changeProfile() {
         browser->deactivateBrowser();
+        miiBrowser->deactivateBrowser();
         playerBrowser->deactivateBrowser();
         const auto candidate=selectNativeProfile();
         if(candidate.state==ProfileSelectionState::Selected) {
             selectedProfile=candidate;
             browser->setProfile(selectedProfile);
+            miiBrowser->setProfile(selectedProfile);
             playerBrowser->setProfile(selectedProfile);
             profileControl->update(selectedProfile);
         } else if(candidate.state==ProfileSelectionState::Failed) {
             brls::Application::notify("app/profile_not_selected"_i18n);
         }
         if(active==1)browser->activateBrowser();
+        else if(active==2)miiBrowser->activateBrowser();
         else if(active==3)playerBrowser->activateBrowser();
         brls::Application::giveFocus(profileControl);
     }
@@ -191,11 +202,13 @@ private:
             return;
         // Keep each tab's controls, in-memory values, focus and scroll position.
         if(active==1)browser->deactivateBrowser();
+        else if(active==2)miiBrowser->deactivateBrowser();
         else if(active==3)playerBrowser->deactivateBrowser();
         content->clearViews(false);
         active = index;
         content->addView(pages[active]);
         if(active==1)browser->activateBrowser();
+        else if(active==2)miiBrowser->activateBrowser();
         else if(active==3)playerBrowser->activateBrowser();
     }
 
@@ -215,6 +228,7 @@ private:
     ProfileSelection selectedProfile;
     ProfileHeader* profileControl=nullptr;
     TextureBrowserScreen* browser=nullptr;
+    MiiBrowserScreen* miiBrowser=nullptr;
     PlayerBrowserScreen* playerBrowser=nullptr;
     brls::Sidebar* sidebar;
     brls::Box* content;

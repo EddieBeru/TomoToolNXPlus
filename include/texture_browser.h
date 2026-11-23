@@ -9,6 +9,7 @@
 
 namespace TextureBrowser {
 constexpr size_t MaxRecords=8192, MaxEntries=2048, MaxPlayerBytes=8*1024*1024;
+constexpr size_t MaxMiiBytes=8*1024*1024, MaxMapBytes=4*1024*1024;
 constexpr size_t MaxImageBytes=4*1024*1024, ReadChunk=64*1024;
 struct AccountKey {
     std::array<uint64_t,2> words{};

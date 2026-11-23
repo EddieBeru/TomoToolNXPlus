@@ -43,7 +43,7 @@ flowchart LR
 | --- | --- | --- | --- | --- |
 | **M0** | `001` | Base, Navegación Global y Texturas (Solo Lectura) | Completado (100% desarrollo + retest físico confirmado) | 100% |
 | **M1** | `002` | Pestaña Player en Modo Solo Lectura (`Player.sav`) | Implementado en host y compilado (pendiente verificación física) | 85% |
-| **M2** | `003` | Pestaña Mii en Modo Solo Lectura (`Mii.sav`) | Pendiente | 0% |
+| **M2** | `003` | Pestaña Mii en Modo Solo Lectura (`Mii.sav`) | Implementado en host y compilado (pendiente verificación física) | 85% |
 | **M3** | `004` | Pestaña Map en Modo Solo Lectura y Vista NanoVG (`Map.sav`) | Pendiente | 0% |
 | **M4** | `005` | Compuerta de Integridad: Backups, Restauración y Flujo de Guardado | Pendiente | 0% |
 | **M5** | `006` | Operaciones Completas de Texturas (UGC Escritura/Importar/Exportar) | Pendiente | 0% |
@@ -80,21 +80,16 @@ flowchart LR
   - **Host y builds completos (`T001`–`T023`)**: aprobadas las 12 suites en `tests/run_texture_browser.sh` (normal y `SANITIZE=1 ASAN_OPTIONS=detect_leaks=0`), `make -j4`, `make -j4 borealis` y auditoría `aarch64-none-elf-nm -C` sin símbolos de escritura (`0` coincidencias).
   - **Pendiente en Switch físico (`T024`)**: despliegue vía DBI MTP y matriz visual/control/táctil en [`specs/002-browse-player-readonly/quickstart.md`](../specs/002-browse-player-readonly/quickstart.md).
 
-### M2 — Pestaña Mii en Modo Solo Lectura (`Mii.sav`) · *Estado: Pendiente (`003`)*
+### M2 — Pestaña Mii en Modo Solo Lectura (`Mii.sav`) · *Estado: Implementado en host / Pendiente validación física (`003`)*
 
-- **Objetivo**: Reemplazar los datos de muestra de la pestaña `Mii` por la inspección real de los residentes en `Mii.sav` (hasta `MII_MAX_SLOTS = 70`), adaptando la navegación a la jerarquía de Borealis sin subpestañas.
-- **Alcance técnico y archivos clave**:
-  - Extraer de [`source/main.cpp`](../source/main.cpp) y [`source/mii_manager.cpp`](../source/mii_manager.cpp) los lectores puros y acotados de residentes y sus secciones:
-    - Estadísticas principales (`MII_STATS_FIELDS`: nombre, nivel/medidor, dinero, cumpleaños, edad directa, personalidad, vínculo, estado de ánimo, saciedad).
-    - Palabras/frases guardadas.
-    - Relaciones (`rel_tier_labels.h`, pares e historial).
-    - Pertenencias, atuendo equipado y bolsillo ([`include/belongings_data.h`](../include/belongings_data.h), [`include/coordinate_data.h`](../include/coordinate_data.h)).
-    - Hábitos ([`include/habits_data.h`](../include/habits_data.h)).
-    - Vivienda/habitación y estilo ([`include/room_style_data.h`](../include/room_style_data.h)) y vista resumen social.
-  - Sustituir la barra legacy de 7 subpestañas por una lista de Miis en la pestaña raíz y pantallas hijas / secciones enfocables con preservación de selección y scroll al volver con `B`.
-- **Criterios de salida / Verificación**:
-  - Pruebas en host cubriendo islas vacías, 1 residente, 70 residentes, relaciones mixtas y datos de `Mii.sav` malformados.
-  - Navegación completa por mando y táctil en 720p/1080p y tres idiomas.
+- **Objetivo**: Reemplazar los datos de muestra de la pestaña `Mii` por la inspección real de los residentes en `Mii.sav` (hasta `MII_MAX_SLOTS = 70`), adaptando la navegación a la jerarquía de Borealis sin subpestañas ([`specs/003-browse-mii-readonly/spec.md`](../specs/003-browse-mii-readonly/spec.md)).
+- **Documentación (`/speckit-plan` y `/speckit-tasks`)**: [`plan.md`](../specs/003-browse-mii-readonly/plan.md), [`research.md`](../specs/003-browse-mii-readonly/research.md), [`data-model.md`](../specs/003-browse-mii-readonly/data-model.md), [`mii-browser.md`](../specs/003-browse-mii-readonly/contracts/mii-browser.md), [`quickstart.md`](../specs/003-browse-mii-readonly/quickstart.md) y [`tasks.md`](../specs/003-browse-mii-readonly/tasks.md).
+- **Alcance técnico implementado**:
+  - Módulo puro de solo lectura [`include/mii_roster.h`](../include/mii_roster.h) y [`source/mii_roster.cpp`](../source/mii_roster.cpp): parseo acotado de `Mii.sav` y `Map.sav` opcional, detección segura de plazas ocupadas (`0..70`), decodificación UTF-16LE con pares sustitutos, 7 secciones (`Estadísticas`, `Palabras`, `Relaciones`, `Pertenencias`, `Hábitos`, `Vivienda` y `Resumen social`) reutilizando [`include/belongings_data.h`](../include/belongings_data.h), [`include/habits_data.h`](../include/habits_data.h) e [`include/rel_tier_labels.h`](../include/rel_tier_labels.h), y controlador `MiiBrowserModel`.
+  - Jerarquía de 3 niveles sin subpestañas [`apps/borealis/source/mii_browser_screen.hpp`](../apps/borealis/source/mii_browser_screen.hpp) / [`apps/borealis/source/mii_browser_screen.cpp`](../apps/borealis/source/mii_browser_screen.cpp) (`MiiBrowserScreen` → `MiiDetailScreen` → `MiiSectionScreen`) conectada en la pestaña índice `2` de [`apps/borealis/source/app.cpp`](../apps/borealis/source/app.cpp), extendiendo `SwitchSource` (`fsOpen_SaveDataReadOnly`) para `"/Mii.sav"` y `"/Map.sav"` con traducciones en `en-US`, `es` y `es-419`.
+- **Evidencia y pendientes**:
+  - **Host y builds completos (`T001`–`T023`)**: aprobadas las 14 suites en `tests/run_texture_browser.sh` (normal y `SANITIZE=1 ASAN_OPTIONS=detect_leaks=0`), paridad i18n (`290` claves), `make -j4`, `make -j4 borealis` y auditoría `aarch64-none-elf-nm -C` sin símbolos de escritura (`0` coincidencias).
+  - **Pendiente en Switch físico (`T024`)**: despliegue vía DBI MTP y matriz visual/control/táctil en [`specs/003-browse-mii-readonly/quickstart.md`](../specs/003-browse-mii-readonly/quickstart.md).
 
 ### M3 — Pestaña Map en Modo Solo Lectura y Vista NanoVG (`Map.sav`) · *Estado: Pendiente (`004`)*
 
