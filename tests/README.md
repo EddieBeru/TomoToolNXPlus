@@ -68,15 +68,18 @@ tests/run_texture_browser.sh
 SANITIZE=1 tests/run_texture_browser.sh
 ```
 
-The script compiles ten independent executables in a temporary directory, runs them,
+The script compiles twelve independent executables in a temporary directory, runs them,
 and removes only that directory. It covers CPU decode golden outputs from the old
 implementation, BC1/BC3 and rectangular canvas layouts, bounded zstd, filename association,
 Player names/index/UTF-16 validation, account-local catalogs, refresh/context transitions,
 preview priority/fallback, worker cancellation/replaced pending jobs/stale deliveries,
-and the Borealis UI screens (`borealis_ui_screens_test.cpp`) against the host UI shim
-(controller-only, touch-only, alternating input, 20 detail/back cycles, 10 tab switches,
-`CatalogSuspended` resume, disappearing-entry fallback, `SettingsScreen`
-draft/dropdown/conflict/dirty-leave flows, and the `Plus` exit menu).
+read-only `Player.sav` binary validation and formatting across all 15 player attributes and
+wish-liberation progress (`player_profile_test.cpp`), read-only session context/account isolation
+(`player_browser_context_test.cpp`), and the Borealis UI screens (`borealis_ui_screens_test.cpp`)
+against the host UI shim (controller-only, touch-only, alternating input, 20 detail/back cycles,
+10 tab switches, `CatalogSuspended`/`Suspended` resume, disappearing-entry fallback, the
+inline `PlayerBrowserScreen` 15-attribute tab, `SettingsScreen` draft/dropdown/conflict/dirty-leave
+flows, and the `Plus` exit menu).
 The real libnx adapter is compiled against tests/support/switch.h to check read-only
 opens, flags, sizes, complete reads, metadata classification, failures and handle cleanup.
 The shim include path is never used by either Switch build. It cannot establish HOS

@@ -1,8 +1,10 @@
+#include "support/player_profile_fixtures.h"
 #include "support/texture_read_shim.h"
 
 #include "app.hpp"
 #include "exit_menu.hpp"
 #include "navigation.hpp"
+#include "player_browser_screen.hpp"
 #include "profile_header.hpp"
 #include "profile_selector.hpp"
 #include "texture_browser_screen.hpp"
@@ -103,28 +105,6 @@ std::vector<uint8_t> compressZstd(const std::vector<uint8_t>& raw) {
     return out;
 }
 
-std::vector<uint8_t> makeFoodNames(size_t count, const std::string& prefix, bool badEntry = false) {
-    std::vector<uint8_t> bytes(0x40 + 4 + count * 128, 0);
-    Fixtures::u32(bytes, 0, 0x01020304u);
-    Fixtures::u32(bytes, 8, 0x30u);
-    Fixtures::u32(bytes, 0x24, 31u);
-    Fixtures::u32(bytes, 0x28, 0x408494f5u);
-    Fixtures::u32(bytes, 0x2c, 0x40u);
-    Fixtures::u32(bytes, 0x40, static_cast<uint32_t>(count));
-    for (size_t i = 0; i < count; ++i) {
-        std::string label = prefix + " " + std::to_string(i);
-        const size_t base = 0x44 + i * 128;
-        for (size_t j = 0; j < label.size() && j < 63; ++j)
-            bytes[base + j * 2] = static_cast<uint8_t>(label[j]);
-    }
-    if (badEntry && count > 2) {
-        // Lone UTF-16 high surrogate triggers namesWarning without blocking entries.
-        bytes[0x44 + 2 * 128] = 0x00;
-        bytes[0x44 + 2 * 128 + 1] = 0xd8;
-    }
-    return bytes;
-}
-
 template <typename T>
 void collectViews(brls::View* root, std::vector<T*>& out) {
     if (!root)
@@ -199,10 +179,19 @@ borealis_app::TextureBrowserScreen* findBrowser(brls::View* root) {
     return list.empty() ? nullptr : list.front();
 }
 
+borealis_app::PlayerBrowserScreen* findPlayerBrowser(brls::View* root) {
+    auto list = findAll<borealis_app::PlayerBrowserScreen>(root);
+    return list.empty() ? nullptr : list.front();
+}
+
 void setBrowserScrollableHeight(brls::View* root) {
     if (auto* browser = findBrowser(root)) {
         if (browser->getContentView())
             browser->getContentView()->setHeight(4000.0f);
+    }
+    if (auto* playerBrowser = findPlayerBrowser(root)) {
+        if (playerBrowser->getContentView())
+            playerBrowser->getContentView()->setHeight(4000.0f);
     }
 }
 
@@ -229,11 +218,11 @@ void populateAccountSaves() {
     saves[1]["/Ugc/UgcFood012.ugctex.zs"] = {0x01, 0x02, 0x03};
     // Target entry below the first screen with valid rectangular 256x512 canvas.
     saves[1]["/Ugc/UgcFood049.canvas.zs"] = rectCanvas;
-    saves[1]["/Player.sav"] = makeFoodNames(99, "IslandA", true);
+    saves[1]["/Player.sav"] = PlayerProfileFixtures::makeSyntheticPlayerSavA(true, true);
 
     saves[2]["/Ugc/UgcFood000.ugctex.zs"] = mainB;
     saves[2]["/Ugc/UgcFood049.ugctex.zs"] = mainB;
-    saves[2]["/Player.sav"] = makeFoodNames(50, "IslandB", false);
+    saves[2]["/Player.sav"] = PlayerProfileFixtures::makeSyntheticPlayerSavB(true);
 }
 
 void resetShimState() {
@@ -764,6 +753,194 @@ int main() {
     assert(pressOn(leaveDlg->buttons[1], brls::BUTTON_A)); // discard
     assert(topContent() == root);
     assert(browser->getContentOffsetY() == 640.0f);
+
+    // 6. Player tab (M1): real read-only Player.sav inspection (US1, US3, US2), controller + touch, isolation, recovery.
+    {
+        auto* unselectedPlayer = new borealis_app::PlayerBrowserScreen(session, [] {});
+        auto labelsUnselected = findAll<brls::Label>(unselectedPlayer);
+        bool sawChooseGlobal = false;
+        for (auto* lbl : labelsUnselected) {
+            if (lbl->getFullText() == "app/player_choose_global")
+                sawChooseGlobal = true;
+        }
+        assert(sawChooseGlobal);
+        unselectedPlayer->freeView();
+    }
+
+    // Activate tab 3 (Jugador): starts at initial account 1 load for Player.sav.
+    assert(press(brls::BUTTON_RT)); // 1->2
+    assert(press(brls::BUTTON_RT)); // 2->3 (Jugador)
+    queue.drain();
+    auto* playerScreen = findPlayerBrowser(root);
+    assert(playerScreen);
+    setBrowserScrollableHeight(root);
+
+    // No sample entries may remain; all 15 attribute rows + secondary labels exist with Account 1 values.
+    assert(findCell(playerScreen, "app/sample_3") == nullptr);
+    auto* pNameCell = findCell(playerScreen, "app/player_field_name");
+    auto* pIslandCell = findCell(playerScreen, "app/player_field_island");
+    auto* pMoneyCell = findCell(playerScreen, "app/player_field_money");
+    auto* pCurrencyCell = findCell(playerScreen, "app/player_field_currency");
+    auto* pWishesCell = findCell(playerScreen, "app/player_field_wishes");
+    auto* pDonationCell = findCell(playerScreen, "app/player_field_donation");
+    auto* pRefreshCell = findCell(playerScreen, "app/browser_refresh");
+    auto* pTabsCell = findCell(playerScreen, "app/tabs");
+    assert(pNameCell && pIslandCell && pMoneyCell && pCurrencyCell && pWishesCell && pDonationCell && pRefreshCell && pTabsCell);
+    assert(findAll<brls::DetailCell>(playerScreen).size() == 17); // Refresh + 15 attributes + Tabs
+    assert(pNameCell->detailLabel.getFullText() == "Álex 😀");
+    assert(pIslandCell->detailLabel.getFullText() == "Ítaca");
+    assert(pMoneyCell->detailLabel.getFullText() == "15 000,00 €");
+    assert(pCurrencyCell->detailLabel.getFullText() == "€ · app/player_currency_euro");
+    assert(pWishesCell->detailLabel.getFullText() == "105");
+
+    // Verify multiline secondary metadata + descriptions exist inline without opening child screens on A/tap.
+    bool sawPron = false, sawLibWishes = false, sawDesc = false;
+    for (auto* lbl : findAll<brls::Label>(playerScreen)) {
+        const auto txt = lbl->getFullText();
+        if (txt.find("A-lex") != std::string::npos && txt.find("app/player_lang_eues") != std::string::npos)
+            sawPron = true;
+        if (txt.find("100 / 268") != std::string::npos)
+            sawLibWishes = true;
+        if (txt.find("app/player_desc_donation") != std::string::npos)
+            sawDesc = true;
+    }
+    assert(sawPron && sawLibWishes && sawDesc);
+
+    assert(pressOn(pWishesCell, brls::BUTTON_A));
+    assert(topContent() == root);
+    tap(pDonationCell);
+    assert(topContent() == root);
+    assert(brls::Application::getCurrentFocus() == pDonationCell);
+
+    // B returns focus to Jugador sidebar item.
+    assert(press(brls::BUTTON_B));
+    assert(brls::Application::getCurrentFocus() == sidebarItems[3]);
+
+    // Refocus Donation, scroll down, and verify 10 consecutive tab switches (SC-003) + Plus dialog cancel preserve focus & scroll.
+    brls::Application::giveFocus(pDonationCell);
+    playerScreen->setContentOffsetY(640.0f, false);
+    for (int sw = 0; sw < 5; ++sw) {
+        assert(press(brls::BUTTON_RT)); // 3->4 (Map)
+        assert(queue.drainAvailable() == 0);
+        assert(press(brls::BUTTON_LT)); // 4->3 (Jugador)
+        assert(queue.drainAvailable() == 0);
+        assert(playerScreen->getContentOffsetY() == 640.0f);
+        assert(brls::Application::getCurrentFocus() == pDonationCell);
+    }
+    assert(press(brls::BUTTON_START));
+    auto* pExitDlg = dynamic_cast<brls::Dialog*>(topContent());
+    assert(pExitDlg && pExitDlg->message == "app/exit_menu_prompt");
+    assert(pressOn(pExitDlg->buttons[0], brls::BUTTON_A)); // cancel
+    assert(topContent() == root);
+    assert(playerScreen->getContentOffsetY() == 640.0f);
+    assert(brls::Application::getCurrentFocus() == pDonationCell);
+
+    // Profile switch to Account 2 isolates data completely; cancelled/failed profile selection retains Account 1.
+    pselUid = {{0, 0}};
+    assert(pressOn(headerControl, brls::BUTTON_A));
+    assert(queue.drainAvailable() == 0);
+    assert(findCell(playerScreen, "app/player_field_name")->detailLabel.getFullText() == "Álex 😀");
+
+    brls::Application::notifications.clear();
+    pselShowRc = 5;
+    assert(pressOn(headerControl, brls::BUTTON_A));
+    assert(!brls::Application::notifications.empty());
+    assert(queue.drainAvailable() == 0);
+    assert(findCell(playerScreen, "app/player_field_name")->detailLabel.getFullText() == "Álex 😀");
+    pselShowRc = 0;
+
+    pselUid = {{2, 0}};
+    assert(pressOn(headerControl, brls::BUTTON_A));
+    queue.drain();
+    assert(findCell(playerScreen, "app/player_field_name")->detailLabel.getFullText() == "Sofía");
+    assert(findCell(playerScreen, "app/player_field_island")->detailLabel.getFullText() == "Avalon");
+    assert(findCell(playerScreen, "app/player_field_money")->detailLabel.getFullText() == "8 500,50");
+    assert(findCell(playerScreen, "app/player_field_currency")->detailLabel.getFullText().find("0x12345678") != std::string::npos);
+    assert(findCell(playerScreen, "app/player_field_tt_penalty")->detailLabel.getFullText() == "app/player_penalty_active");
+
+    bool sawWarningsNotice = false, sawUnavailableWishes = false, sawFutureDonation = false;
+    for (auto* lbl : findAll<brls::Label>(playerScreen)) {
+        const auto txt = lbl->getFullText();
+        if (txt.find("app/player_warnings_notice") != std::string::npos)
+            sawWarningsNotice = true;
+        if (txt.find("app/player_meta_wishes_unavailable") != std::string::npos)
+            sawUnavailableWishes = true;
+        if (txt.find("app/player_donation_future") != std::string::npos)
+            sawFutureDonation = true;
+    }
+    assert(sawWarningsNotice && sawUnavailableWishes && sawFutureDonation);
+
+    // Switch back to Account 1 via touch.
+    pselUid = {{1, 0}};
+    tap(headerControl);
+    queue.drain();
+    setBrowserScrollableHeight(root);
+    assert(findCell(playerScreen, "app/player_field_name")->detailLabel.getFullText() == "Álex 😀");
+
+    // US3: Error injection, double-activation guard, suspend/resume during Loading, and retry recovery on Jugador tab.
+    noSave = true;
+    assert(pressOn(pRefreshCell, brls::BUTTON_A));
+    assert(!pRefreshCell->isFocusable());
+    playerScreen->activateBrowser(); // no duplicate request
+    queue.drain();
+    assert(queue.drainAvailable() == 0);
+    assert(findCell(playerScreen, "app/player_field_name") == nullptr);
+    noSave = false;
+
+    auto savedPlayer1 = saves[1];
+    saves[1]["/Player.sav"] = {0x01, 0x02, 0x03}; // corrupt
+    assert(pressOn(pRefreshCell, brls::BUTTON_A));
+    queue.drain();
+    assert(findCell(playerScreen, "app/player_field_name") == nullptr);
+
+    saves[1]["/Player.sav"] = std::vector<uint8_t>(TextureBrowser::MaxPlayerBytes + 1, 0); // oversized > 8 MiB
+    tap(pRefreshCell);
+    queue.drain();
+    assert(findCell(playerScreen, "app/player_field_name") == nullptr);
+
+    saves[1] = savedPlayer1;
+    tap(pRefreshCell); // touch recovery back to valid 15 attributes
+    queue.drain();
+    setBrowserScrollableHeight(root);
+    assert(findCell(playerScreen, "app/player_field_name")->detailLabel.getFullText() == "Álex 😀");
+
+    // Suspend while Loading -> leave to Map -> return issues single reload restoring focus & scroll.
+    {
+        pWishesCell = findCell(playerScreen, "app/player_field_wishes");
+        assert(pWishesCell);
+        brls::Application::giveFocus(pWishesCell);
+        playerScreen->setContentOffsetY(360.0f, false);
+
+        std::mutex m;
+        std::condition_variable cv;
+        bool entered = false, released = false;
+        beforeRead = [&] {
+            std::unique_lock<std::mutex> lock(m);
+            entered = true;
+            cv.notify_all();
+            assert(cv.wait_for(lock, std::chrono::seconds(5), [&] { return released; }));
+        };
+        assert(pressOn(pRefreshCell, brls::BUTTON_A));
+        {
+            std::unique_lock<std::mutex> lock(m);
+            assert(cv.wait_for(lock, std::chrono::seconds(5), [&] { return entered; }));
+        }
+        assert(press(brls::BUTTON_RT)); // leave Jugador -> suspend + cancel
+        {
+            std::lock_guard<std::mutex> lock(m);
+            released = true;
+            cv.notify_all();
+        }
+        beforeRead = {};
+        assert(press(brls::BUTTON_LT)); // return to Jugador -> single reload
+        queue.drain();
+        assert(queue.drainAvailable() == 0);
+        setBrowserScrollableHeight(root);
+        pWishesCell = findCell(playerScreen, "app/player_field_wishes");
+        assert(pWishesCell);
+        assert(playerScreen->getContentOffsetY() == 360.0f);
+        assert(brls::Application::getCurrentFocus() == pWishesCell);
+    }
 
     // Isolated synthetic config tests for TextureSettings (Save/Backup/Conflict/ExitMenu).
     char tmpTemplate[] = "/tmp/tomotool-ui-screens.XXXXXX";

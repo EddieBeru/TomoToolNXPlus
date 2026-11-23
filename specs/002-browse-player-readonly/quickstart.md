@@ -71,3 +71,15 @@ Resultado esperado:
    - [ ] Abrir `Y` y cancelar, abrir `Plus` y cancelar, y cambiar de pestaña 10 veces regresando a `Jugador`: conserva cuenta, atributo enfocado y scroll.
    - [ ] Verificar idiomas `en-US`, `es` y `es-419`.
    - [ ] Confirmar que `Textures` y `Ajustes de texturas` siguen intactos y que los bytes/inventario del guardado de juego permanecen 100 % idénticos.
+
+## Matriz de verificación `SC-001`–`SC-007`
+
+| Criterio | Cobertura esperada | Host (`tests/run_texture_browser.sh`) | Build / ELF Audit | Emulador | Switch físico |
+| --- | --- | --- | --- | --- | --- |
+| `SC-001` | 15 atributos reales y aislamiento entre cuentas A/B + `data/seed_Player.bin` | **PASS** (`player-profile`, `player-context`, `ui-screens` normal y `SANITIZE=1`) | Compilado (`make borealis`) | No ejecutado | Pendiente de prueba en consola (`T024`) |
+| `SC-002` | Operación completa solo con mando y solo con touch | **PASS** (shim UI `borealis_ui_screens_test.cpp` normal y `SANITIZE=1`) | Compilado | No ejecutado | Pendiente de prueba física (`T024`) |
+| `SC-003` | 10 cambios de pestaña + diálogos `Y`/`Plus` conservando foco y scroll | **PASS** (shim UI `borealis_ui_screens_test.cpp` normal y `SANITIZE=1`) | Compilado | No ejecutado | Pendiente de prueba física (`T024`) |
+| `SC-004` | Sin perfil, `NoSave`, acceso denegado, corrupción, límite `8 MiB`, reservas y `Actualizar` | **PASS** (`player-profile`, `player-context`, `ui-screens` normal y `SANITIZE=1`) | Compilado | No ejecutado | Pendiente de prueba física (`T024`) |
+| `SC-005` | Respuesta de carga `< 1 s` y navegación `< 250 ms` | **Parcial PASS** (suspensión/reanudación no bloqueante en host) | Compilado | No ejecutado | Pendiente de medición física (`T024`) |
+| `SC-006` | Cero escrituras/mutaciones/guardado tras todo el recorrido | **PASS** (spy `ReadSource` + inmutabilidad exacta de búfer) | **PASS** (`aarch64-none-elf-nm`: 0 símbolos prohibidos) | No ejecutado | Pendiente de comprobación física (`T024`) |
+| `SC-007` | 3 idiomas (`en-US`, `es`, `es-419`), claro/oscuro, 720p y dock sin recortes | **Parcial PASS** (paridad `162` claves JSON en 3 idiomas y shim UI) | **PASS** (`make -j4` y `make -j4 borealis`) | No ejecutado | Pendiente de verificación visual (`T024`) |

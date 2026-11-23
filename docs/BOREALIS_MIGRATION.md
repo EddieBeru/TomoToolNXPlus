@@ -201,3 +201,15 @@ confirmed the M0 flows look good aside from wide lateral spacing around `á` in
 `PlSharedFontType_Standard` as the primary font with CJK/icon fallbacks without modifying
 vendored Borealis sources; after redeploying with verified MTP SHA-256 readback, the
 user confirmed the fix on physical Switch hardware (“ahora sí”).
+
+
+### Milestone M1 — Read-only Player tab (Player.sav) — 2026-11-19
+
+- Replaced the fictional sample entries in the `Player` (`Jugador`) tab (`apps/borealis/source/app.cpp`) with `PlayerBrowserScreen` (`apps/borealis/source/player_browser_screen.{hpp,cpp}`), backed by the pure read-only parser and formatter `PlayerProfile` (`include/player_profile.h`, `source/player_profile.cpp`).
+- Reuses `TextureBrowser::ReadSource` (`fsOpen_SaveDataReadOnly`) and `TextureBrowser::Session` without linking `SaveMount`, `SaveWorkflow`, `Backup`, `MiiManager`, or `SaveEditor::Save`, and without modifying `source/main.cpp`.
+- Empirical `seed_Player.bin` check confirmed `Player.HowToCallName` and `Player.HowToCallIslandName` use `DT_WStr64` (128 bytes) and `DT_Bool64Key` entries may carry `slot == 0`; the new reader supports both `DT_WStr64` and `DT_WStr32` with full UTF-16LE surrogate pairs.
+- Renders all 15 attributes inline in the scrollable list (each `DetailCell` followed by an indented multiline `Label` for secondary metadata such as pronunciation/language, wish liberation progress over 268 entries, and donation elapsed days, plus read-only description), preserving `focusTarget` and scroll offset across tab switches and global dialogs.
+- **Verification**:
+  - Host: all 12 suites in `tests/run_texture_browser.sh` (plain and `SANITIZE=1 ASAN_OPTIONS=detect_leaks=0`), `en-US`/`es`/`es-419` i18n key parity (`162` keys each), and standalone host regressions passed.
+  - Builds & ELF audit: `make -j4` and `make -j4 borealis` succeeded; `aarch64-none-elf-nm -C build/borealis/TomoToolNXPlusBorealis.elf` reported 0 references to `SaveMount`, `SaveWorkflow`, `Backup`, `MiiManager`, or `SaveEditor::Save`.
+  - Emulator: not executed. Physical Switch hardware verification remains pending per `specs/002-browse-player-readonly/quickstart.md`.

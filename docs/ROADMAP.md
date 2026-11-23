@@ -42,7 +42,7 @@ flowchart LR
 | Milestone | Spec | Nombre | Estado | Avance estimado |
 | --- | --- | --- | --- | --- |
 | **M0** | `001` | Base, Navegación Global y Texturas (Solo Lectura) | Completado (100% desarrollo + retest físico confirmado) | 100% |
-| **M1** | `002` | Pestaña Player en Modo Solo Lectura (`Player.sav`) | Planificada (lista para `/speckit-tasks`) | 20% |
+| **M1** | `002` | Pestaña Player en Modo Solo Lectura (`Player.sav`) | Implementado en host y compilado (pendiente verificación física) | 85% |
 | **M2** | `003` | Pestaña Mii en Modo Solo Lectura (`Mii.sav`) | Pendiente | 0% |
 | **M3** | `004` | Pestaña Map en Modo Solo Lectura y Vista NanoVG (`Map.sav`) | Pendiente | 0% |
 | **M4** | `005` | Compuerta de Integridad: Backups, Restauración y Flujo de Guardado | Pendiente | 0% |
@@ -69,17 +69,16 @@ flowchart LR
   - **Confirmación física en Switch (2026-11-19)**: desplegado con verificación SHA-256 por MTP; el usuario confirmó los flujos M0 y el espaciado proporcional corregido en acentos españoles tras promover `PlSharedFontType_Standard` en [`apps/borealis/source/navigation.cpp`](../apps/borealis/source/navigation.cpp) (ver [`docs/HARDWARE_UI_FEEDBACK.md`](HARDWARE_UI_FEEDBACK.md)).
   - **Notas formales separadas**: las mediciones cronometradas de latencia (`SC-005`) y recorridos exhaustivos por tema/dock/3 idiomas en [`specs/001-browse-real-textures/quickstart.md`](../specs/001-browse-real-textures/quickstart.md) quedan registradas como pendientes formales de matriz sin bloquear **M1**.
 
-### M1 — Pestaña Player en Modo Solo Lectura (`Player.sav`) · *Estado: Planificada (`002`)*
+### M1 — Pestaña Player en Modo Solo Lectura (`Player.sav`) · *Estado: Implementado en host / Pendiente validación física (`002`)*
 
 - **Objetivo**: Reemplazar los datos de muestra de la pestaña `Player` por lectura real de `Player.sav` para la cuenta seleccionada, sin capacidades de escritura ni montaje escribible ([`specs/002-browse-player-readonly/spec.md`](../specs/002-browse-player-readonly/spec.md)).
-- **Documentación de diseño (`/speckit-plan`)**: [`plan.md`](../specs/002-browse-player-readonly/plan.md), [`research.md`](../specs/002-browse-player-readonly/research.md), [`data-model.md`](../specs/002-browse-player-readonly/data-model.md), [`player-browser.md`](../specs/002-browse-player-readonly/contracts/player-browser.md) y [`quickstart.md`](../specs/002-browse-player-readonly/quickstart.md).
-- **Alcance técnico y archivos clave**:
-  - Extraer un lector puro/acotado para los 15 campos de `PLAYER_FIELDS` actualmente acoplados en [`source/main.cpp`](../source/main.cpp) (Nombre + pronunciación/idioma, Nombre de isla + pronunciación/idioma, Dinero, Moneda, Conteo de arranques, Tono de piel, Cumpleaños día/mes/año, Tamaño de isla, Nivel de fuente, Deseos y conteo de deseos liberados usando [`include/wishes_data.h`](../include/wishes_data.h), Región, estado de penalización por Time-Travel y fecha/hora de última donación).
-  - Reutilizar la fuente privada de solo lectura (`fsOpen_SaveDataReadOnly`, [`apps/borealis/source/texture_read_source.cpp`](../apps/borealis/source/texture_read_source.cpp) o capa compartida de lectura por cuenta) e invalidación al cambiar de perfil.
-  - Implementar la vista de consulta en Borealis con estados claros de carga, partida ausente, error de parseo y actualización de los 3 ficheros `i18n`.
-- **Criterios de salida / Verificación**:
-  - Pruebas de regresión en host con `Player.sav` sintético (campos presentes, ausentes, límites de buffer y corrupción).
-  - Compilación cruzada sin enlazar `SaveMount`, `SaveWorkflow` ni escritores; verificación en Switch física comparando valores mostrados contra una partida real sin modificarla.
+- **Documentación (`/speckit-plan` y `/speckit-tasks`)**: [`plan.md`](../specs/002-browse-player-readonly/plan.md), [`research.md`](../specs/002-browse-player-readonly/research.md), [`data-model.md`](../specs/002-browse-player-readonly/data-model.md), [`player-browser.md`](../specs/002-browse-player-readonly/contracts/player-browser.md), [`quickstart.md`](../specs/002-browse-player-readonly/quickstart.md) y [`tasks.md`](../specs/002-browse-player-readonly/tasks.md).
+- **Alcance técnico implementado**:
+  - Módulo puro de solo lectura [`include/player_profile.h`](../include/player_profile.h) y [`source/player_profile.cpp`](../source/player_profile.cpp): parseo acotado de los 15 atributos de `Player.sav`, soporte de `DT_WStr64` y `DT_WStr32` con pares sustitutos UTF-16LE completos, catálogos de moneda/región/idioma/tono/tamaño, deseos liberados contra [`include/wishes_data.h`](../include/wishes_data.h), reloj explícito para donación y controlador `PlayerBrowserModel`.
+  - Pantalla inline [`apps/borealis/source/player_browser_screen.hpp`](../apps/borealis/source/player_browser_screen.hpp) / [`apps/borealis/source/player_browser_screen.cpp`](../apps/borealis/source/player_browser_screen.cpp) conectada en [`apps/borealis/source/app.cpp`](../apps/borealis/source/app.cpp) reutilizando [`apps/borealis/source/texture_read_source.cpp`](../apps/borealis/source/texture_read_source.cpp) (`fsOpen_SaveDataReadOnly`) y traducciones `en-US` / `es` / `es-419`.
+- **Evidencia y pendientes**:
+  - **Host y builds completos (`T001`–`T023`)**: aprobadas las 12 suites en `tests/run_texture_browser.sh` (normal y `SANITIZE=1 ASAN_OPTIONS=detect_leaks=0`), `make -j4`, `make -j4 borealis` y auditoría `aarch64-none-elf-nm -C` sin símbolos de escritura (`0` coincidencias).
+  - **Pendiente en Switch físico (`T024`)**: despliegue vía DBI MTP y matriz visual/control/táctil en [`specs/002-browse-player-readonly/quickstart.md`](../specs/002-browse-player-readonly/quickstart.md).
 
 ### M2 — Pestaña Mii en Modo Solo Lectura (`Mii.sav`) · *Estado: Pendiente (`003`)*
 
@@ -165,7 +164,7 @@ Este inventario rastrea cada flujo existente en el editor SDL legacy ([`source/m
 | Navegación global (`ZL`/`ZR`, `D-pad`, `A`, `B`, táctil, `Plus` Guardar/Salir) | **Migrado** (política centralizada y footer propio) | `M0` | Host + retest físico confirmado ([record](HARDWARE_UI_FEEDBACK.md)) |
 | Preferencias de textura (`config.ini` con draft y backup verificado) | **Migrado (v0.2.0)** | `M0` | Host + emulador adaptado; pendiente SD física ([record](BOREALIS_MIGRATION.md#verification-of-v020)) |
 | Texturas: listar slots UGC reales, nombres en `Player.sav` y vista previa | **Migrado (Solo Lectura)** | `M0` | Host (10 suites) + confirmación física M0 y fuente (`2026-11-19`); matriz formal en [quickstart](../specs/001-browse-real-textures/quickstart.md) |
-| Player: consultar los 15 campos de `Player.sav` y deseos liberados | Muestra ficticia | `M1` | — |
+| Player: consultar los 15 campos de `Player.sav` y deseos liberados | **Migrado (Solo Lectura)** | `M1` | Host (12 suites + ASan/UBSan) + `make`/`make borealis` + `nm` ELF audit; pendiente Switch físico ([quickstart](../specs/002-browse-player-readonly/quickstart.md)) |
 | Mii: listar hasta 70 residentes y consultar stats, palabras, relaciones, pertenencias, hábitos, vivienda y social | Muestra ficticia | `M2` | — |
 | Map: visualizar cuadrícula `120 × 80`, objetos, casas y detalles en NanoVG | Muestra ficticia | `M3` | — |
 | Backups por usuario, restauración (`RestorePicker`), montaje escribible y commit seguro | Ausente (no enlazado a propósito) | `M4` | — |
